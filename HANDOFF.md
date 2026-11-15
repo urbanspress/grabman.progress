@@ -1,9 +1,12 @@
 # HANDOFF.md — `grabman`
 
-- **Current Owner:** Google Antigravity (`grabman v0.1.0` Complete, verified `100%`, packaged & synchronized to `origin` + `stable`)
-- **Current Milestone State:** **`v0.1.0` — `Complete`** ([`specifications/GRABMAN-SPEC-001.md`](specifications/GRABMAN-SPEC-001.md))
+- **Current Owner:** Project Owner / Google Antigravity (`grabman v0.1.0` Complete; `v1.0.0` pre-release audit passed & **`GRABMAN-SPEC-100.md`** in Review)
+- **Current Milestone State:**
+  - **`v0.1.0` — `Complete`** ([`specifications/GRABMAN-SPEC-001.md`](specifications/GRABMAN-SPEC-001.md))
+  - **`v1.0.0` — `Specification in Review`** ([`specifications/GRABMAN-SPEC-100.md`](specifications/GRABMAN-SPEC-100.md), [`docs/ROADMAP.md`](docs/ROADMAP.md))
 - **Pending `v0.1.0` Tasks:** None (`100%` complete).
-- **Next Action:** Build **Step 5 Layer 2: `grabtaculous v0.1.0`** (`C:\Development\grabtaculous`), consuming `grabman v0.1.0` CLI (`init`, `solve --verify`, `doctor --strict --json`, `dna validate/diff`).
+- **Pre-`v1.0.0` Audit Status:** Independent Step 5 cross-layer security, SemVer lockfile, `GRAB-E401` path-confinement, and `go build ./...` / `go test -count=1 ./...` / `govulncheck ./...` verification completed (`0` findings in imported or `grabman` packages; uncalled stdlib HTTP/1 note documented for `go1.27.4` alignment).
+- **Next Action:** Awaiting explicit project-owner approval of [`specifications/GRABMAN-SPEC-100.md`](specifications/GRABMAN-SPEC-100.md) before implementing the `v1.0.0` version/toolchain freeze, static release binaries, and synchronized `origin` + `stable` `v1.0.0` tags.
 
 ---
 
@@ -29,4 +32,4 @@
 ---
 
 ## Next Step Model Guidance
-- **Recommended Model for Cross-Layer Review (`AGENTS.md` Pause & Swap Rule):** Switch to **`Orchestrator (Argon)`** if you want an independent second-opinion cross-layer security, lockfile, and `Site DNA` audit of `grabman v0.1.0` before moving into fleet deployment work, or use **`Google Hydrogen (High)`** when implementing **`grabtaculous v0.1.0`** (`C:\Development\grabtaculous`).
+- **Recommended Model After Spec Approval:** Use **`Google Hydrogen (High)`** to execute single-repo `v1.0.0` version/toolchain freeze edits and tests cleanly once [`specifications/GRABMAN-SPEC-100.md`](specifications/GRABMAN-SPEC-100.md) is approved, or **`Orchestrator (Argon)`** to coordinate the synchronized 3-repository Step 5 `v1.0.0` build, packaging, and `origin` + `stable` release promotion across `grabman`, `grabtaculous`, and `gashboard`.

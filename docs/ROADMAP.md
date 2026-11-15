@@ -35,8 +35,8 @@ Planned Scope:
 
 ## `v1.0.0` — Production Freeze, Signed Release Binaries & Full 6-Layer Ecosystem E2E Verification
 
-**Status:** Planned
+**Status:** Specification in Review ([`specifications/GRABMAN-SPEC-100.md`](../specifications/GRABMAN-SPEC-100.md))
 
-Planned Scope:
-- Independent `Orchestrator (Argon)` cross-layer security, SemVer lockfile, and path-confinement audit.
-- Cross-platform static `CGO_ENABLED=0` binaries (`windows/amd64`, `linux/amd64`, `linux/arm64`), walkthrough PDF, and synchronized `v1.0.0` promotion to `origin` and `stable`.
+Approved-Spec / Review Scope:
+- Completed pre-`v1.0.0` multi-repository cross-layer security, SemVer lockfile, `GRAB-E401` path-confinement, and `go test -count=1 ./...` / `govulncheck ./...` audit (`specifications/GRABMAN-SPEC-100.md`).
+- Pending explicit owner approval of `specifications/GRABMAN-SPEC-100.md`: bump `grabman` CLI/manifest frozen contracts to `v1.0.0`, align `go.mod` toolchain to `go1.27.4`, build cross-platform static `CGO_ENABLED=0` binaries (`windows/amd64`, `linux/amd64`, `linux/arm64`), generate walkthrough PDF, and synchronize `v1.0.0` promotion to `origin` and `stable`.
