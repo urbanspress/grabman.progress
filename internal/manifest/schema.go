@@ -13,6 +13,7 @@ import (
 
 const (
 	SchemaVersionV010 = "0.1.0"
+	SchemaVersionV100 = "1.0.0"
 	LockVersionV1     = "1"
 )
 
@@ -133,11 +134,12 @@ func ValidateManifest(m *Manifest) error {
 	if m == nil {
 		return NewError(ErrManifestMalformed, "grabman.json is empty", "Run 'grabman init' to generate a valid grabman.json.")
 	}
-	if strings.TrimSpace(m.SchemaVersion) != SchemaVersionV010 {
+	sv := strings.TrimSpace(m.SchemaVersion)
+	if sv != SchemaVersionV010 && sv != SchemaVersionV100 {
 		return NewError(
 			ErrManifestMalformed,
-			fmt.Sprintf("unsupported grabman.json schema_version %q (expected %q)", m.SchemaVersion, SchemaVersionV010),
-			fmt.Sprintf("Set schema_version to %q.", SchemaVersionV010),
+			fmt.Sprintf("unsupported grabman.json schema_version %q (expected %q or %q)", m.SchemaVersion, SchemaVersionV010, SchemaVersionV100),
+			fmt.Sprintf("Set schema_version to %q (or %q).", SchemaVersionV100, SchemaVersionV010),
 		)
 	}
 	if strings.TrimSpace(m.ProjectName) == "" {
@@ -215,6 +217,9 @@ func LoadLockfile(workspaceRoot string) (*Lockfile, []byte, error) {
 	}
 	if l.LockVersion != LockVersionV1 {
 		return nil, nil, NewError(ErrManifestMalformed, fmt.Sprintf("unsupported lock_version %q (expected %q)", l.LockVersion, LockVersionV1), "Regenerate grabman.lock with grabman solve.")
+	}
+	if strings.TrimSpace(l.SchemaVersion) != SchemaVersionV010 && strings.TrimSpace(l.SchemaVersion) != SchemaVersionV100 {
+		return nil, nil, NewError(ErrManifestMalformed, fmt.Sprintf("unsupported grabman.lock schema_version %q (expected %q or %q)", l.SchemaVersion, SchemaVersionV010, SchemaVersionV100), "Regenerate grabman.lock with grabman solve.")
 	}
 	return &l, raw, nil
 }

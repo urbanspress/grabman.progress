@@ -84,7 +84,7 @@ func Run(workspaceDir string, opts Options) (*Report, error) {
 	}
 
 	rep := &Report{
-		SchemaVersion: manifest.SchemaVersionV010,
+		SchemaVersion: manifest.SchemaVersionV100,
 		Workspace:     realRoot,
 		Checks:        []CheckItem{},
 	}

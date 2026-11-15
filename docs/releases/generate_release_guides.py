@@ -281,10 +281,27 @@ grabman dna diff ./old-dna.json ./new-dna.json</pre>
 """
 
 
+def render_v100_html() -> str:
+    html = render_v010_html()
+    replacements = [
+        ("Grabman v0.1.0", "Grabman v1.0.0"),
+        ("PRE-1.0 v0.1.0", "v1.0.0 Production Stability Freeze"),
+        ("Go <code>1.26.0</code>", "Go <code>1.27.4</code>"),
+        ("<td><code>^0.1.0</code></td>\n          <td><code>0.1.0</code></td>\n          <td>Pre-<code>1.0</code> Step 5 integration layer across local CLI &amp; VPS deploys</td>",
+         "<td><code>&gt;=0.1.0 &lt;2.0.0</code></td>\n          <td><code>1.0.0</code></td>\n          <td>Production-frozen Step 5 contract (dual support for <code>0.1.0</code> &amp; <code>1.0.0</code> schemas)</td>"),
+        ("Step 5 Layer 1 Complete (Next: Grabtaculous v0.1.0 Orchestrator)",
+         "Step 5 Layer 1 Production Freeze (Synchronized with Grabtaculous v1.0.0 &amp; Gashboard v1.0.0)"),
+    ]
+    for old, new in replacements:
+        html = html.replace(old, new)
+    return html
+
+
 def main():
-    version = sys.argv[1].lstrip("v") if len(sys.argv) > 1 else "0.1.0"
+    version = sys.argv[1].lstrip("v") if len(sys.argv) > 1 else "1.0.0"
     renderers = {
         "0.1.0": render_v010_html,
+        "1.0.0": render_v100_html,
     }
     if version not in renderers:
         raise ValueError(f"Unsupported guide version '{version}'. Available: {', '.join(sorted(renderers))}")

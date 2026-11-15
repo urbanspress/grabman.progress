@@ -24,7 +24,7 @@ type LayerSpec struct {
 	Available   []string // ascending SemVer order
 }
 
-// EcosystemMatrix returns the frozen 6-layer compatibility matrix for Step 5 v0.1.0.
+// EcosystemMatrix returns the frozen 6-layer compatibility matrix for Step 5 v1.0.0.
 func EcosystemMatrix() []LayerSpec {
 	return []LayerSpec{
 		{
@@ -77,9 +77,9 @@ func EcosystemMatrix() []LayerSpec {
 			Repo:        "urbanspress/grabman,urbanspress/grabtaculous,urbanspress/gashboard",
 			Aliases:     []string{"grabman", "grabtaculous", "gashboard", "step_5", "step-5"},
 			BaselineMin: "0.1.0",
-			DefaultExpr: ">=0.1.0 <1.0.0",
-			SemVerTier:  "pre-1.0",
-			Available:   []string{"0.1.0"},
+			DefaultExpr: ">=0.1.0 <2.0.0",
+			SemVerTier:  "1.x-frozen",
+			Available:   []string{"0.1.0", "0.2.0", "0.3.0", "1.0.0"},
 		},
 	}
 }
@@ -235,9 +235,13 @@ func ComputeLockfile(workspaceRoot string, opts SolveOptions) (*manifest.Lockfil
 		return nil, err
 	}
 
+	lockSchemaVersion := strings.TrimSpace(m.SchemaVersion)
+	if lockSchemaVersion == "" {
+		lockSchemaVersion = manifest.SchemaVersionV100
+	}
 	lock := &manifest.Lockfile{
 		LockVersion:           manifest.LockVersionV1,
-		SchemaVersion:         manifest.SchemaVersionV010,
+		SchemaVersion:         lockSchemaVersion,
 		ProjectName:           m.ProjectName,
 		Profile:               m.Profile,
 		Layers:                layers,
@@ -432,7 +436,7 @@ func Solve(workspaceRoot string, opts SolveOptions) (*SolveResult, error) {
 	}
 	lockPath, _, _ := manifest.ResolveWorkspaceFile(realRoot, "grabman.lock", manifest.ResolveOptions{})
 	return &SolveResult{
-		SchemaVersion:    manifest.SchemaVersionV010,
+		SchemaVersion:    manifest.SchemaVersionV100,
 		Workspace:        realRoot,
 		LockfilePath:     lockPath,
 		LockDigestSHA256: lock.LockDigestSHA256,
@@ -519,7 +523,7 @@ func Verify(workspaceRoot string, opts SolveOptions) (*VerifyResult, error) {
 	if len(drifts) > 0 || existing.LockDigestSHA256 != fresh.LockDigestSHA256 {
 		sort.Strings(drifts)
 		return &VerifyResult{
-			SchemaVersion:    manifest.SchemaVersionV010,
+			SchemaVersion:    manifest.SchemaVersionV100,
 			Verified:         false,
 			Deterministic:    false,
 			Workspace:        realRoot,
@@ -536,7 +540,7 @@ func Verify(workspaceRoot string, opts SolveOptions) (*VerifyResult, error) {
 	}
 
 	return &VerifyResult{
-		SchemaVersion:    manifest.SchemaVersionV010,
+		SchemaVersion:    manifest.SchemaVersionV100,
 		Verified:         true,
 		Deterministic:    true,
 		Workspace:        realRoot,

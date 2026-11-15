@@ -4,6 +4,21 @@ All notable changes to **`grabman`** follow strict Semantic Versioning (`MAJOR.M
 
 ---
 
+## `v1.0.0` — Step 5 Production Stability Freeze (2026-11-15)
+
+- **SemVer Tier:** `v1.0.0 — Production Stability Freeze` (`100%` backwards compatible with `v0.1.0` manifests, lockfiles, and CLI outputs)
+- **Ecosystem Impact:** Zero breaking changes to frozen upstream `v1.x` contracts (`GRAB v1.1.0`, `Grex JS v1.0.0`, `GrabLab CMS v1.0.1`, `Grex Theme Builder v1.0.0`, `Groxy AI v1.0.0`). Unblocks Step 6 (`Groxy Desk`) consumers pinning `>=1.0.0 <2.0.0`.
+
+### Changed & Verified
+- **CLI, Schema & Toolchain Freeze:**
+  - Promoted CLI `Version` and default `schema_version` (`cmd/grabman/main.go`, `internal/manifest/schema.go`, `internal/doctor/checks.go`, `internal/scaffolder`, `internal/sitedna`, `internal/solver`) to **`1.0.0`** while preserving dual validation and deterministic lockfile compatibility for existing `"0.1.0"` manifests and lockfiles.
+  - Aligned `go.mod` on `toolchain go1.27.4` matching `grabtaculous v1.0.0` and `gashboard v1.0.0`, verified with `govulncheck ./...` (`0` vulnerabilities) and `go mod verify`.
+  - Updated `EcosystemMatrix()` `step-5` release list to `["0.1.0", "0.2.0", "0.3.0", "1.0.0"]` with default constraint `">=0.1.0 <2.0.0"` and `SemVerTier: "1.x-frozen"`.
+- **Cross-Platform Release Artifacts:**
+  - Built static `CGO_ENABLED=0` binaries for `windows/amd64` (`grabman-windows-amd64.exe`), `linux/amd64` (`grabman-linux-amd64`), and `linux/arm64` (`grabman-linux-arm64`), alongside [`docs/releases/pdf/Grabman-v1.0.0-Guide.pdf`](docs/releases/pdf/Grabman-v1.0.0-Guide.pdf), `grabman-v1.0.0-bundle.zip`, and `SHA256SUMS.txt`.
+
+---
+
 ## `v0.1.0` — Project Scaffolder, Compatibility Doctor, `Site DNA` Validator & Deterministic `grabman.lock` Solver (2026-11-15)
 
 - **SemVer Tier:** `PRE-1.0 v0.1.0` (Step 5 Layer 1 baseline deliverable)

@@ -47,7 +47,7 @@ func TestCLIEndToEndWorkflow(t *testing.T) {
 
 	// 1. version
 	out, code := runCLI(t, bin, "version", "--json")
-	if code != 0 || !strings.Contains(out, `"version": "0.1.0"`) {
+	if code != 0 || !strings.Contains(out, `"version": "1.0.0"`) || !strings.Contains(out, `"schema_version": "1.0.0"`) {
 		t.Fatalf("version --json failed (code=%d): %s", code, out)
 	}
 

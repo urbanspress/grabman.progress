@@ -35,8 +35,8 @@ Planned Scope:
 
 ## `v1.0.0` — Production Freeze, Signed Release Binaries & Full 6-Layer Ecosystem E2E Verification
 
-**Status:** Specification in Review ([`specifications/GRABMAN-SPEC-100.md`](../specifications/GRABMAN-SPEC-100.md))
+**Status:** Complete ([`specifications/GRABMAN-SPEC-100.md`](../specifications/GRABMAN-SPEC-100.md))
 
-Approved-Spec / Review Scope:
-- Completed pre-`v1.0.0` multi-repository cross-layer security, SemVer lockfile, `GRAB-E401` path-confinement, and `go test -count=1 ./...` / `govulncheck ./...` audit (`specifications/GRABMAN-SPEC-100.md`).
-- Pending explicit owner approval of `specifications/GRABMAN-SPEC-100.md`: bump `grabman` CLI/manifest frozen contracts to `v1.0.0`, align `go.mod` toolchain to `go1.27.4`, build cross-platform static `CGO_ENABLED=0` binaries (`windows/amd64`, `linux/amd64`, `linux/arm64`), generate walkthrough PDF, and synchronize `v1.0.0` promotion to `origin` and `stable`.
+Completed Scope:
+- Completed Step 5 multi-repository cross-layer security, SemVer lockfile, `GRAB-E401` path-confinement, and `go test -count=1 ./...` / `govulncheck ./...` verification (`0` vulnerabilities, [`specifications/GRABMAN-SPEC-100.md`](../specifications/GRABMAN-SPEC-100.md)).
+- Froze `grabman` CLI, doctor, solver, scaffolder, and `Site DNA` contracts at `v1.0.0` with dual backwards compatibility for `"0.1.0"` and `"1.0.0"` manifests, aligned `go.mod` toolchain on `go1.27.4`, expanded `EcosystemMatrix()` `step-5` to `0.1.0`..`1.0.0`, built cross-platform static `CGO_ENABLED=0` binaries (`windows/amd64`, `linux/amd64`, `linux/arm64`), generated `docs/releases/pdf/Grabman-v1.0.0-Guide.pdf`, and synchronized `v1.0.0` releases across `origin` (`urbanspress/grabman.progress`) and `stable` (`urbanspress/grabman.stable`).

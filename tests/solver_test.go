@@ -175,3 +175,47 @@ func TestSolverVerifyDetectsDriftAndChecksumTamper(t *testing.T) {
 		t.Fatalf("expected GRABMAN-E103 on tampered grex.elements.json, got %v (code=%s)", err, manifest.ExtractCode(err))
 	}
 }
+
+func TestSchemaVersionDualCompatibilityAndStep5MatrixV100(t *testing.T) {
+	// Verify v0.1.0 manifest continues solving & verifying alongside v1.0.0 manifests.
+	ws010 := t.TempDir()
+	m010 := validTestManifest("legacy-v010")
+	m010.SchemaVersion = manifest.SchemaVersionV010
+	m010.TargetRuntime["step-5"] = ">=0.1.0 <1.0.0"
+	writeTestManifest(t, ws010, m010)
+
+	res010, err := solver.Solve(ws010, solver.SolveOptions{FixedTimestamp: "2026-11-15T00:00:00Z"})
+	if err != nil {
+		t.Fatalf("Solve v0.1.0 failed: %v", err)
+	}
+	if res010.Lockfile.SchemaVersion != manifest.SchemaVersionV010 {
+		t.Fatalf("expected v0.1.0 lockfile schema_version to preserve 0.1.0, got %s", res010.Lockfile.SchemaVersion)
+	}
+	if got := res010.Lockfile.Layers["step-5"].Version; got != "0.3.0" {
+		t.Fatalf("expected >=0.1.0 <1.0.0 to resolve to step-5 0.3.0, got %s", got)
+	}
+	if _, err := solver.Verify(ws010, solver.SolveOptions{}); err != nil {
+		t.Fatalf("Verify v0.1.0 failed: %v", err)
+	}
+
+	// Verify v1.0.0 manifest resolves step-5 to 1.0.0.
+	ws100 := t.TempDir()
+	m100 := validTestManifest("frozen-v100")
+	m100.SchemaVersion = manifest.SchemaVersionV100
+	m100.TargetRuntime["step-5"] = ">=0.1.0 <2.0.0"
+	writeTestManifest(t, ws100, m100)
+
+	res100, err := solver.Solve(ws100, solver.SolveOptions{FixedTimestamp: "2026-11-15T00:00:00Z"})
+	if err != nil {
+		t.Fatalf("Solve v1.0.0 failed: %v", err)
+	}
+	if res100.Lockfile.SchemaVersion != manifest.SchemaVersionV100 {
+		t.Fatalf("expected v1.0.0 lockfile schema_version 1.0.0, got %s", res100.Lockfile.SchemaVersion)
+	}
+	if got := res100.Lockfile.Layers["step-5"].Version; got != "1.0.0" {
+		t.Fatalf("expected >=0.1.0 <2.0.0 to resolve to step-5 1.0.0, got %s", got)
+	}
+	if _, err := solver.Verify(ws100, solver.SolveOptions{}); err != nil {
+		t.Fatalf("Verify v1.0.0 failed: %v", err)
+	}
+}

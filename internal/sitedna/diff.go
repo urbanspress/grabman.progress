@@ -5,6 +5,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"grabman/internal/manifest"
 )
 
 // FieldChange represents a deterministic old -> new change for a named property.
@@ -90,7 +92,7 @@ func DiffBytes(oldRaw, newRaw []byte) (*DiffReport, error) {
 // DiffBundles computes a deterministic structured diff between two validated Site DNA bundles.
 func DiffBundles(oldB, newB *Bundle) *DiffReport {
 	report := &DiffReport{
-		SchemaVersion: "0.1.0",
+		SchemaVersion: manifest.SchemaVersionV100,
 		SiteName: FieldChange{
 			Name: "site_name",
 			Old:  oldB.SiteName,

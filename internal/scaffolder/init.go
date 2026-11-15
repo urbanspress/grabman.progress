@@ -188,7 +188,7 @@ func Init(opts InitOptions) (*InitResult, error) {
 	written = append(written, "grabman.lock")
 
 	return &InitResult{
-		SchemaVersion:    manifest.SchemaVersionV010,
+		SchemaVersion:    manifest.SchemaVersionV100,
 		Workspace:        realRoot,
 		ProjectName:      ctx.ProjectName,
 		Profile:          ctx.Profile,

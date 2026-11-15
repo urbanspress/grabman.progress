@@ -18,7 +18,7 @@ import (
 )
 
 // Version identifies the release version (overridable via -ldflags "-X main.Version=...").
-var Version = "0.1.0"
+var Version = "1.0.0"
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
@@ -81,7 +81,7 @@ func cmdVersion(args []string, stdout, stderr io.Writer) int {
 		writeJSON(stdout, map[string]any{
 			"name":           "grabman",
 			"version":        Version,
-			"schema_version": manifest.SchemaVersionV010,
+			"schema_version": manifest.SchemaVersionV100,
 			"lock_version":   manifest.LockVersionV1,
 		})
 		return 0

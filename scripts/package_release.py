@@ -77,7 +77,7 @@ def collect_bundle_files():
 
 
 def main():
-    version = (sys.argv[1] if len(sys.argv) > 1 else "0.1.0").lstrip("v")
+    version = (sys.argv[1] if len(sys.argv) > 1 else "1.0.0").lstrip("v")
 
     if DIST_DIR.exists():
         for old in DIST_DIR.iterdir():
@@ -87,6 +87,7 @@ def main():
 
     win_bin = build_static_binary("windows", "amd64", "grabman-windows-amd64.exe", version)
     lin_bin = build_static_binary("linux", "amd64", "grabman-linux-amd64", version)
+    arm_bin = build_static_binary("linux", "arm64", "grabman-linux-arm64", version)
 
     bundle_path = DIST_DIR / f"grabman-v{version}-bundle.zip"
     files = collect_bundle_files()
@@ -95,7 +96,7 @@ def main():
             rel = file_path.relative_to(REPO_ROOT).as_posix()
             zf.write(file_path, arcname=f"grabman-v{version}/{rel}")
 
-    checksum_targets = [win_bin, lin_bin, bundle_path]
+    checksum_targets = [win_bin, lin_bin, arm_bin, bundle_path]
     pdf_path = REPO_ROOT / "docs" / "releases" / "pdf" / f"Grabman-v{version}-Guide.pdf"
     if not pdf_path.exists():
         raise FileNotFoundError(f"Expected walkthrough PDF missing: {pdf_path}")
