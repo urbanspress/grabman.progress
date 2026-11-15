@@ -1,6 +1,6 @@
 # GRABMAN-SPEC-001: `grabman v0.1.0` Ecosystem Project Scaffolder, Compatibility Doctor, `Site DNA` Bridge & `grabman.lock` Solver
 
-- **Status:** Specification in Review (Awaiting Project-Owner Approval — Pre-Implementation Design Only)
+- **Status:** Complete (Implemented, verified `100%` against `GRAB v1.1.0` & live `Groxy AI`, packaged, and synchronized to `origin` + `stable`)
 - **Milestone:** `v0.1.0` — Step 5 Foundation (Project Scaffolder, Cross-Layer Doctor, `Site DNA` Validator & Deterministic `grabman.lock` Solver)
 - **Foundational Upstream Baselines (`v1.x` Contracts):**
   - **GRAB:** `v1.1.0` (`urbanspress/grab` — `grab version`, `grab check`, `grab format`, `grab migrate`, `grab serve`, `grab mcp`, `grab.platform.json`, `grab.data.json`, `grab.api.json`, `grab.connect.lock`, `ADR-025a..h`, `ADR-027a..d`, `ADR-028a..c`)

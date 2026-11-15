@@ -2,26 +2,52 @@
 
 ![Built with GRAB v1.1.0](docs/badges/built-with-grab.svg)
 ![GRAB Ecosystem Step 5 — grabman](docs/badges/ecosystem-step-5.svg)
-![v0.1.0 Spec — In Review](docs/badges/spec-in-review.svg)
+![grabman v0.1.0 Complete](docs/badges/release-v0.1.0.svg)
 
 **`grabman`** is the Ecosystem Project Scaffolder, Compatibility Doctor, `Site DNA` Validator, and Deterministic `grabman.lock` Solver for **Step 5 of the Post-1.0 GRAB Ecosystem**.
 
-- **Current Status:** `v0.1.0` — **Specification in Review** ([`specifications/GRABMAN-SPEC-001.md`](specifications/GRABMAN-SPEC-001.md) drafted; zero implementation code written pending owner approval).
+- **Current Status:** **`v0.1.0` — Complete** ([`specifications/GRABMAN-SPEC-001.md`](specifications/GRABMAN-SPEC-001.md) | [Walkthrough PDF](docs/releases/pdf/Grabman-v0.1.0-Guide.pdf) | [Changelog](CHANGELOG.md))
 - **Development Repo (`origin`):** `https://github.com/urbanspress/grabman.progress`
 - **Production Release Repo (`stable`):** `https://github.com/urbanspress/grabman.stable`
 
 ---
 
-## Core Capabilities (Planned `v0.1.0`)
+## Core Capabilities (`v0.1.0`)
 
 1. **Deterministic Project Scaffolder (`grabman init`):**
-   - Generates clean, `grab check`-ready workspaces (`app`, `cms-stack`, `ai-stack`, or hydrated from a Groxy AI `--from-site-dna` snapshot) with `grabman.json`, `grabman.lock`, `grab.platform.json`, and `grab.data.json`—zero hardcoded secrets and zero unverified remote install scripts.
-2. **Plain-English Compatibility Doctor (`grabman doctor`):**
-   - Verifies local `GRAB v1.1.0`, `Grex JS v1.0.0`, `GrabLab CMS v1.0.1`, `Grex Theme Builder v1.0.0`, and `Groxy AI v1.0.0` readiness, `--read-only` container flags, SHA-256 contract digests, capability boundaries, and `ADR-025c` decimal precision.
+   - Generates clean, `grab check`-ready workspaces (`app`, `cms-stack`, `ai-stack`, or hydrated directly from a **Groxy AI** `--from-site-dna` snapshot) with `grabman.json`, `grabman.lock`, `grab.platform.json`, `grab.data.json`, semantic zero-`<div>` `.grab.html` templates, and `--read-only` Docker Compose baselines.
+   - Strictly confines paths inside the target workspace (`GRAB-E401` parity blocking `.git`, `.env`, `.ssh`, `*.key`, `*.pem`, `id_rsa`, `id_ed25519`, symlinks escaping root, and `..`), refuses partial overwrites without `--force`, and runs zero remote `curl | sh` scripts.
+2. **Plain-English Compatibility & Security Doctor (`grabman doctor`):**
+   - Audits local `GRAB v1.1.0` compilation (`grab check`), `theme/theme.json` `mode: "visual"` exclusivity, frozen contract SHA-256 parity (`grex.elements.json`, `grex.js`, `seo-playbook.v1.json`), container hardening (`read_only: true`, `cap_drop: ["ALL"]`, `no-new-privileges:true`, pinned image tags, `127.0.0.1` loopback bindings), zero hardcoded secrets/private IPs (redacted in all outputs), and `Site DNA` precision. Outputs both plain-English advice and machine-readable `--json` (`--strict`).
 3. **`grabman.lock` 6-Layer Compatibility Solver (`grabman solve`):**
-   - Solves and pins SemVer (`ADR-027c`) version bounds and SHA-256 contract hashes across all 6 ecosystem layers into a deterministic `grabman.lock` file (`--verify` detects drift before deployment).
+   - Resolves and pins SemVer (`ADR-027c`) bounds and SHA-256 contract hashes across all 6 ecosystem layers into deterministic `grabman.lock` files; `solve --verify` fails closed (`exit != 0`) on any lockfile/contract drift, version downgrade, or unapproved jump to `v2.0.0`.
 4. **`Site DNA` Bridge (`grabman dna`):**
-   - Validates and diffs portable `groxy-site-dna-v0.4.0` bundles exported from **Groxy AI** (`GET /api/groxy/site-dna/export`) for safe zero-downtime fleet rollouts through **Grabtaculous** and **Gashboard**.
+   - Validates and diffs portable `groxy-site-dna-v0.4.0` / `v1.0.0` bundles exported from **Groxy AI** (`GET /api/groxy/site-dna/export`), enforcing exact base-10 `ADR-025c` `GrabDecimal`/`GrabInteger` wire strings and rejecting IEEE float drift, `<div>`, `<script>`, `on*`, or unsafe URLs (`javascript:`, `data:`, `vbscript:`).
+
+---
+
+## Quick Start
+
+```bash
+# Build static binary from source (pure Go stdlib, CGO_ENABLED=0)
+CGO_ENABLED=0 go build -trimpath -o grabman ./cmd/grabman
+
+# Scaffold a hardened GRAB + GrabLab + Groxy AI workspace
+grabman init --dir ./my-shop --profile ai-stack --name "Urban Roasters"
+
+# Hydrate a storefront directly from a Groxy AI Site DNA export
+grabman init --dir ./my-shop --from-site-dna ./site-dna.json
+
+# Verify 6-layer compatibility & SHA-256 lockfile deterministically
+grabman solve --dir ./my-shop --verify
+
+# Run full security, config, template & live `grab check` audit
+grabman doctor --dir ./my-shop --strict
+
+# Validate & diff Groxy AI Site DNA bundles
+grabman dna validate ./site-dna.json --json
+grabman dna diff ./old-site-dna.json ./new-site-dna.json
+```
 
 ---
 
@@ -38,11 +64,13 @@
 
 ---
 
-## Governance & Specifications
+## Governance & Documentation
 
-- [Agent Rules (`AGENTS.md`)](AGENTS.md)
-- [Engineering Invariants (`GRABMAN-EXPERT.md`)](GRABMAN-EXPERT.md)
+- [Walkthrough PDF Guide (`docs/releases/pdf/Grabman-v0.1.0-Guide.pdf`)](docs/releases/pdf/Grabman-v0.1.0-Guide.pdf)
+- [Changelog (`CHANGELOG.md`)](CHANGELOG.md)
 - [`v0.1.0` Specification (`specifications/GRABMAN-SPEC-001.md`)](specifications/GRABMAN-SPEC-001.md)
 - [Roadmap (`docs/ROADMAP.md`)](docs/ROADMAP.md)
+- [Engineering Invariants (`GRABMAN-EXPERT.md`)](GRABMAN-EXPERT.md)
+- [Agent Rules (`AGENTS.md`)](AGENTS.md)
 - [Handoff Log (`HANDOFF.md`)](HANDOFF.md)
 - [License (`LICENSE` — MIT)](LICENSE)

@@ -1,8 +1,9 @@
 # HANDOFF.md — `grabman`
 
-- **Current Owner:** Google Antigravity (`Google Hydrogen (XHigh)` — Bootstrap & `v0.1.0` Specification Drafted; awaiting explicit project-owner approval before any implementation code is written)
-- **Current Milestone State:** **`v0.1.0` — `Specification in Review`** ([`specifications/GRABMAN-SPEC-001.md`](specifications/GRABMAN-SPEC-001.md)) — Zero Go application code written yet per Spec-First Approval Gate.
-- **Next Action:** Project owner reviews `specifications/GRABMAN-SPEC-001.md` (alongside `GRABTACULOUS-SPEC-001.md` and `GASHBOARD-SPEC-001.md`).
+- **Current Owner:** Google Antigravity (`grabman v0.1.0` Complete, verified `100%`, packaged & synchronized to `origin` + `stable`)
+- **Current Milestone State:** **`v0.1.0` — `Complete`** ([`specifications/GRABMAN-SPEC-001.md`](specifications/GRABMAN-SPEC-001.md))
+- **Pending `v0.1.0` Tasks:** None (`100%` complete).
+- **Next Action:** Build **Step 5 Layer 2: `grabtaculous v0.1.0`** (`C:\Development\grabtaculous`), consuming `grabman v0.1.0` CLI (`init`, `solve --verify`, `doctor --strict --json`, `dna validate/diff`).
 
 ---
 
@@ -15,18 +16,17 @@
 
 ---
 
-## Bootstrap Completion Log (Pre-Implementation)
-1. Initialized twin GitHub repositories: `urbanspress/grabman.progress` (`origin`) and `urbanspress/grabman.stable` (`stable`).
-2. Added governance and documentation baseline:
-   - `AGENTS.md` (4-tier model routing, Mandatory Pause & Swap Rule, `sync-notebook-sources.ps1` rule, SemVer + 6-Layer Ecosystem Compatibility Matrix)
-   - `GRABMAN-EXPERT.md`
-   - `docs/ROADMAP.md`
-   - `README.md` with committed emerald `#10B981` SVG badges (`docs/badges/*.svg`)
-   - `LICENSE` (MIT) and `.gitignore`
-3. Drafted [`specifications/GRABMAN-SPEC-001.md`](specifications/GRABMAN-SPEC-001.md) covering `grabman init`, `grabman doctor`, `grabman solve` (`grabman.lock`), and `grabman dna` (`groxy-site-dna-v0.4.0` validation & diffing).
+## `v0.1.0` Completion & Verification Log
+1. Implemented all core pure-Go stdlib packages (`internal/manifest`, `internal/sitedna`, `internal/solver`, `internal/doctor`, `internal/scaffolder`) and CLI entrypoint (`cmd/grabman`).
+2. Executed verification gates cleanly after final edits:
+   - `go build ./...` & `go vet ./...` (`CGO_ENABLED=0` static binaries built for `windows/amd64` and `linux/amd64`) — `100%` pass.
+   - `go test -count=1 ./...` across `solver_test.go`, `sitedna_test.go`, `scaffolder_test.go`, `doctor_test.go`, and `cli_integration_test.go` — `100%` pass (zero skipped tests), including live `GRAB v1.1.0` `grab check` compilation and live `Groxy AI` (`public/groxy/site-context.js`) `Site DNA` export compatibility.
+   - `go mod verify` and `govulncheck ./...` — `0` vulnerabilities.
+3. Generated [`docs/releases/pdf/Grabman-v0.1.0-Guide.pdf`](docs/releases/pdf/Grabman-v0.1.0-Guide.pdf), source bundle archive, `CGO_ENABLED=0` static binaries, and `SHA256SUMS.txt`.
+4. Published synchronized `v0.1.0` GitHub Releases on both `urbanspress/grabman.progress` (`origin`) and `urbanspress/grabman.stable` (`stable`) with mandatory SemVer header & 6-Layer Ecosystem Compatibility Matrix.
+5. Updated `C:\Development\ECOSYSTEM-SNAPSHOT.md` via `C:\Development\GRAB\scripts\sync-notebook-sources.ps1`.
 
 ---
 
 ## Next Step Model Guidance
-- **Recommended Model for Reviewing/Refining Spec:** **`Google Hydrogen (Medium)`** if you want edits or refinements to `GRABMAN-SPEC-001.md`.
-- **Recommended Model Once Spec Is Approved:** **`Google Hydrogen (High)`** (or **`Google Hydrogen (Extra)`** when coordinating cross-repo `grabman` + `grabtaculous` + `gashboard` integration) to implement `grabman v0.1.0`, pausing before final `v0.1.0` / `v1.0.0` audits to switch to **`Orchestrator (Argon)`** for an independent security & compatibility matrix review.
+- **Recommended Model for Cross-Layer Review (`AGENTS.md` Pause & Swap Rule):** Switch to **`Orchestrator (Argon)`** if you want an independent second-opinion cross-layer security, lockfile, and `Site DNA` audit of `grabman v0.1.0` before moving into fleet deployment work, or use **`Google Hydrogen (High)`** when implementing **`grabtaculous v0.1.0`** (`C:\Development\grabtaculous`).

@@ -13,9 +13,9 @@
 
 ## `v0.1.0` — Ecosystem Project Scaffolder (`grabman init`), Compatibility Doctor (`grabman doctor`), `Site DNA` Bridge (`grabman dna`) & `grabman.lock` Solver (`grabman solve`)
 
-**Status:** Specification in Review ([`specifications/GRABMAN-SPEC-001.md`](../specifications/GRABMAN-SPEC-001.md))
+**Status:** Complete ([`specifications/GRABMAN-SPEC-001.md`](../specifications/GRABMAN-SPEC-001.md))
 
-Planned Scope (Awaiting Approval):
+Approved Scope:
 - **`grabman init`:** Deterministic, offline-safe project scaffolder for `app`, `cms-stack`, `ai-stack`, and `--from-site-dna` profiles generating `grabman.json`, `grabman.lock`, `grab.platform.json`, and `grab.data.json` with zero hardcoded secrets and `GRAB-E401` path confinement.
 - **`grabman doctor`:** Cross-layer compatibility and `--read-only` readiness doctor checking installed `grab v1.1.0` / runtime binaries, `grab check` parity, capability flags, `grex.elements.json` / `grex.js` SHA-256 digests, and `ADR-025c` decimal precision with plain-English + `--json` diagnostics.
 - **`grabman solve` (`grabman.lock`):** Deterministic 6-layer SemVer constraint solver (`ADR-027c`) pinning exact release versions and SHA-256 contract hashes into `grabman.lock` (`--verify` fail-closed drift detection).
