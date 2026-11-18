@@ -34,6 +34,31 @@ func FormatPlainEnglish(r *Report) string {
 			b.WriteString(fmt.Sprintf("        Fix: %s\n", c.Remediation))
 		}
 	}
+
+	if len(r.Dependencies) > 0 {
+		b.WriteString("\nDependencies & Version Compatibility:\n")
+		for _, dep := range r.Dependencies {
+			tag := "[OK]"
+			switch dep.Status {
+			case "warning":
+				tag = "[WARN]"
+			case "blocked":
+				tag = "[BLOCKED]"
+			}
+			installedNote := ""
+			if dep.Installed != "" {
+				installedNote = fmt.Sprintf(", installed: v%s", dep.Installed)
+			}
+			lockedNote := ""
+			if dep.Locked != "" {
+				lockedNote = fmt.Sprintf(", locked: %s", dep.Locked)
+			}
+			b.WriteString(fmt.Sprintf("  %s %-13s configured: %-18s expected: %-16s%s%s\n", tag, dep.Layer, dep.Configured, dep.Expected, lockedNote, installedNote))
+			if dep.Status != "compatible" {
+				b.WriteString(fmt.Sprintf("                 %s\n", dep.Message))
+			}
+		}
+	}
 	return b.String()
 }
 

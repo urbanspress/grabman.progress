@@ -1,21 +1,32 @@
 # HANDOFF.md — `grabman`
 
-- **Current Owner:** Project Owner / Google Antigravity (`grabman v1.0.0` Complete — Step 5 Production Stability Freeze Synchronized on `origin` & `stable`)
+- **Current Owner:** Project Owner / Google Antigravity (`grabman v1.1.0` Complete — Synchronized on `origin` & `stable`)
 - **Current Milestone State:**
   - **`v0.1.0` — `Complete`** ([`specifications/GRABMAN-SPEC-001.md`](specifications/GRABMAN-SPEC-001.md))
   - **`v1.0.0` — `Complete`** ([`specifications/GRABMAN-SPEC-100.md`](specifications/GRABMAN-SPEC-100.md), [`docs/ROADMAP.md`](docs/ROADMAP.md))
-- **Pending `v1.0.0` Tasks:** None (`100%` complete).
-- **Release Readiness:** Step 5 Layer 1 (`grabman v1.0.0`) is frozen for **Step 6 (`Groxy Desk`)** consumers alongside `Grabtaculous v1.0.0` and `Gashboard v1.0.0`.
-- **Next Action:** Ready for Step 6 (`Groxy Desk`) integration consuming frozen `v1.0.0` contracts.
+  - **`v1.1.0` — `Complete`** ([`CHANGELOG.md`](CHANGELOG.md), [`docs/ROADMAP.md`](docs/ROADMAP.md)): Interactive Next.js/Composer-style `grabman init`, System Prerequisite Gate (`grab >= 1.1.0` + PostgreSQL check), mandatory Grex JS `v1.0.0` (`public/grex/`), canonical Grisp workspace layout (`src/`, `views/`, `public/grex/`, `storage/`, `uploads/`, `0600` `.env`), `Dependencies & Version Compatibility` section in `grabman doctor`, and non-blocking `--warn-incompatible` pin warnings.
+- **Pending `v1.1.0` Tasks:** None (`100%` complete).
+- **Release Readiness:** `grabman v1.1.0` (`MINOR 1.x.0`) is `100%` backwards compatible with `v0.1.0` and `v1.0.0` manifests, `grab init`, **Grabtaculous v1.1.0**, and **Gashboard v1.0.0**.
+- **Next Action:** Installed alongside `GRAB v1.1.0` and `Grabtaculous v1.1.0` on local Windows workstation and Contabo VPS.
 
 ---
 
 ## Frozen Upstream Contracts (Unmodified)
 - **GRAB:** `v1.1.0` (`urbanspress/grab`)
 - **Grex JS:** `v1.0.0` (`urbanspress/grex-js`)
-- **GrabLab CMS:** `v1.0.1` (`urbanspress/grablab-cms`)
+- **GrabLab CMS:** `v1.0.1` (`>= 1.0.1 < 2.0.0`, including `v1.1.0` / `v1.4.0` / `v1.4.1`) (`urbanspress/grablab-cms`)
 - **Grex Theme Builder:** `v1.0.0` (`urbanspress/grex-builder`)
 - **Groxy AI:** `v1.0.0` (`urbanspress/groxy-ai`)
+
+---
+
+## `v1.1.0` Completion & Verification Log
+1. Upgraded `internal/scaffolder/` with embedded frozen Grex JS `v1.0.0` assets (`grex.js`, `tokens.css`, `grex.elements.json`), `CheckPrerequisites` (`grab >= 1.1.0` + PostgreSQL check when GrabLab CMS selected), `RunInteractiveSurvey`, canonical Grisp project structure (`src/app.grab`, `views/index.grab.html`, `views/home.grab.html`, `public/grex/*`, `storage/`, `uploads/`, symlink-confined `0600` `.env`, `.env.example`, `deploy/.env.example`), and `--read-only` `deploy/docker-compose.yml` updates.
+2. Upgraded `internal/solver/` and `internal/doctor/` with `Dependencies & Version Compatibility` plain-English + `--json` auditing, `1.1.0`/`1.4.0`/`1.4.1` GrabLab CMS and `1.1.0` Step-5 catalog support, and non-blocking `WARNING` diagnostics (`--warn-incompatible`) for intentionally pinned incompatible ranges in `grabman.json`.
+3. Executed verification gates cleanly after final edits:
+   - `go vet ./...`, `go test -count=1 ./...` (100% pass across all unit & CLI integration tests), `go mod verify`, and `govulncheck ./...` (`No vulnerabilities found.`).
+4. Generated [`docs/releases/pdf/Grabman-v1.1.0-Guide.pdf`](docs/releases/pdf/Grabman-v1.1.0-Guide.pdf), source bundle `grabman-v1.1.0-bundle.zip`, `CGO_ENABLED=0` static binaries, and `SHA256SUMS.txt`.
+5. Published synchronized `v1.1.0` GitHub Releases on both `urbanspress/grabman.progress` (`origin`) and `urbanspress/grabman.stable` (`stable`).
 
 ---
 

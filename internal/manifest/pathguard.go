@@ -408,3 +408,50 @@ func WriteFileAtomic(workspaceRoot, relPath string, data []byte, opts ResolveOpt
 	cleanup = false
 	return nil
 }
+
+// WriteWorkspaceDotEnv atomically writes `.env` at the workspace root with strict 0600 permissions
+// while keeping general workspace path operations closed against `.env` access.
+func WriteWorkspaceDotEnv(workspaceRoot string, data []byte) error {
+	realRoot, err := filepath.EvalSymlinks(workspaceRoot)
+	if err != nil {
+		return WrapError(ErrPathConfinement, "GRAB-E401 parity: invalid workspace root for .env generation", "Provide a valid workspace directory.", err)
+	}
+	dotEnvPath := filepath.Join(realRoot, ".env")
+	realTarget, err := EvalExistingSymlinks(dotEnvPath)
+	if err != nil {
+		return WrapError(ErrPathConfinement, "GRAB-E401 parity: .env target cannot be resolved", "Ensure .env is not a symlink escaping workspace.", err)
+	}
+	if filepath.Dir(realTarget) != realRoot || filepath.Base(realTarget) != ".env" {
+		return NewError(ErrPathConfinement, "GRAB-E401 parity: .env target escapes workspace root", "Remove escaping symlinks at .env.")
+	}
+	if st, statErr := os.Lstat(dotEnvPath); statErr == nil && st.Mode()&os.ModeSymlink != 0 {
+		return NewError(ErrPathConfinement, "GRAB-E401 parity: refusing to overwrite symlinked .env", "Remove symlinked .env before initializing.")
+	}
+	tmp, err := os.CreateTemp(realRoot, ".grabman-env-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	cleanup := true
+	defer func() {
+		if cleanup {
+			_ = os.Remove(tmpName)
+		}
+	}()
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(0o600); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpName, dotEnvPath); err != nil {
+		return err
+	}
+	cleanup = false
+	return nil
+}

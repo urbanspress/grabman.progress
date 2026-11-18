@@ -43,6 +43,46 @@ func TestDoctorHealthyWorkspaceAndJSONFormat(t *testing.T) {
 	if decoded["status"] != "healthy" {
 		t.Fatalf("expected status=healthy in JSON, got %v", decoded["status"])
 	}
+	deps, ok := decoded["dependencies"].([]any)
+	if !ok || len(deps) != 6 {
+		t.Fatalf("expected 6 dependency layers in JSON dependencies array, got %T (%v)", decoded["dependencies"], decoded["dependencies"])
+	}
+	plain := doctor.FormatPlainEnglish(rep)
+	if !strings.Contains(plain, "Dependencies & Version Compatibility:") || !strings.Contains(plain, "grablab-cms") {
+		t.Fatalf("expected Dependencies & Version Compatibility section in plain-English output:\n%s", plain)
+	}
+}
+
+func TestDoctorNonBlockingWarningOnIncompatiblePin(t *testing.T) {
+	grabBin := doctor.LocateGrabBinary("")
+	ws := filepath.Join(t.TempDir(), "pin-override")
+	if _, err := scaffolder.Init(scaffolder.InitOptions{
+		TargetDir:   ws,
+		Profile:     "cms-stack",
+		ProjectName: "Pinned App",
+	}); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	manifestPath := filepath.Join(ws, "grabman.json")
+	raw, _ := os.ReadFile(manifestPath)
+	mutated := strings.Replace(string(raw), `"^1.0.1"`, `"=1.0.0"`, 1)
+	if err := os.WriteFile(manifestPath, []byte(mutated), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Non-strict doctor exits 0 with WARNING status instead of blocking local workflow
+	rep, err := doctor.Run(ws, doctor.Options{GrabBinary: grabBin, Strict: false})
+	if err != nil {
+		t.Fatalf("doctor.Run failed: %v", err)
+	}
+	if rep.ExitCode(false) != 0 || rep.Status != doctor.OverallWarnings {
+		t.Fatalf("expected non-blocking warnings (exit 0), got status=%s code=%d:\n%s", rep.Status, rep.ExitCode(false), doctor.FormatPlainEnglish(rep))
+	}
+	plain := doctor.FormatPlainEnglish(rep)
+	if !strings.Contains(plain, "[WARN]") || !strings.Contains(plain, "1.0.0") || !strings.Contains(plain, ">=1.0.1 <2.0.0") {
+		t.Fatalf("expected expected-vs-pinned warning in doctor report:\n%s", plain)
+	}
 }
 
 func TestDoctorSecurityHardeningAndSecretRedaction(t *testing.T) {

@@ -212,10 +212,59 @@ func TestSchemaVersionDualCompatibilityAndStep5MatrixV100(t *testing.T) {
 	if res100.Lockfile.SchemaVersion != manifest.SchemaVersionV100 {
 		t.Fatalf("expected v1.0.0 lockfile schema_version 1.0.0, got %s", res100.Lockfile.SchemaVersion)
 	}
-	if got := res100.Lockfile.Layers["step-5"].Version; got != "1.0.0" {
-		t.Fatalf("expected >=0.1.0 <2.0.0 to resolve to step-5 1.0.0, got %s", got)
+	if got := res100.Lockfile.Layers["step-5"].Version; got != "1.1.0" {
+		t.Fatalf("expected >=0.1.0 <2.0.0 to resolve to step-5 1.1.0, got %s", got)
 	}
 	if _, err := solver.Verify(ws100, solver.SolveOptions{}); err != nil {
 		t.Fatalf("Verify v1.0.0 failed: %v", err)
+	}
+}
+
+func TestSolverWarnIncompatibleAndInspectDependencies(t *testing.T) {
+	ws := t.TempDir()
+	m := validTestManifest("warn-override")
+	m.TargetRuntime["grablab-cms"] = "=1.0.0"
+	writeTestManifest(t, ws, m)
+
+	// Strict solve (default) still rejects incompatible <1.0.1 pin
+	if _, err := solver.Solve(ws, solver.SolveOptions{FixedTimestamp: "2026-11-15T00:00:00Z"}); manifest.ExtractCode(err) != manifest.ErrSemVerViolation {
+		t.Fatalf("expected strict Solve to fail with GRABMAN-E102, got %v", err)
+	}
+
+	// Non-blocking --warn-incompatible succeeds with clear warning
+	res, err := solver.Solve(ws, solver.SolveOptions{
+		FixedTimestamp:   "2026-11-15T00:00:00Z",
+		WarnIncompatible: true,
+	})
+	if err != nil {
+		t.Fatalf("Solve with WarnIncompatible failed: %v", err)
+	}
+	if res.Lockfile.CompatibilityVerified {
+		t.Fatalf("expected CompatibilityVerified=false when incompatible pin override is active")
+	}
+	if got := res.Lockfile.Layers["grablab-cms"].Version; got != "1.0.0" {
+		t.Fatalf("expected pinned override 1.0.0, got %s", got)
+	}
+	if len(res.Warnings) == 0 || !strings.Contains(res.Warnings[0], "WARNING") || !strings.Contains(res.Warnings[0], "1.0.0") {
+		t.Fatalf("expected clear non-blocking WARNING, got: %v", res.Warnings)
+	}
+
+	vRes, err := solver.Verify(ws, solver.SolveOptions{WarnIncompatible: true})
+	if err != nil || !vRes.Verified || len(vRes.Warnings) == 0 {
+		t.Fatalf("Verify with WarnIncompatible failed: res=%+v err=%v", vRes, err)
+	}
+
+	deps, err := solver.InspectDependencies(ws, map[string]string{"grab": "1.1.0"})
+	if err != nil {
+		t.Fatalf("InspectDependencies failed: %v", err)
+	}
+	foundCMSWarn := false
+	for _, d := range deps {
+		if d.Layer == "grablab-cms" && d.Status == "warning" && !d.Compatible {
+			foundCMSWarn = true
+		}
+	}
+	if !foundCMSWarn {
+		t.Fatalf("expected grablab-cms dependency audit warning, got: %+v", deps)
 	}
 }

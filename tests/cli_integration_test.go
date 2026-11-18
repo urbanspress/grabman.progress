@@ -47,7 +47,7 @@ func TestCLIEndToEndWorkflow(t *testing.T) {
 
 	// 1. version
 	out, code := runCLI(t, bin, "version", "--json")
-	if code != 0 || !strings.Contains(out, `"version": "1.0.0"`) || !strings.Contains(out, `"schema_version": "1.0.0"`) {
+	if code != 0 || !strings.Contains(out, `"version": "1.1.0"`) || !strings.Contains(out, `"schema_version": "1.0.0"`) {
 		t.Fatalf("version --json failed (code=%d): %s", code, out)
 	}
 
@@ -80,6 +80,25 @@ func TestCLIEndToEndWorkflow(t *testing.T) {
 	out, code = runCLI(t, bin, "solve", "--dir", ws, "--verify", "--json")
 	if code == 0 || !strings.Contains(out, "GRABMAN-E102") {
 		t.Fatalf("expected non-zero GRABMAN-E102 failure on v2.0.0 jump (code=%d): %s", code, out)
+	}
+
+	// 5b. solve --warn-incompatible + non-strict doctor emit non-blocking WARNING on <2.0.0 pin
+	warnWS := filepath.Join(tmp, "warn-cli-ws")
+	if out, code := runCLI(t, bin, "init", "--dir", warnWS, "--profile", "cms-stack", "--name", "WarnCLI", "--non-interactive"); code != 0 {
+		t.Fatalf("init warn-cli-ws failed (code=%d): %s", code, out)
+	}
+	wmPath := filepath.Join(warnWS, "grabman.json")
+	wmBytes, _ := os.ReadFile(wmPath)
+	if err := os.WriteFile(wmPath, []byte(strings.Replace(string(wmBytes), `"^1.0.1"`, `"=1.0.0"`, 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, code = runCLI(t, bin, "solve", "--dir", warnWS, "--warn-incompatible", "--json")
+	if code != 0 || !strings.Contains(out, "WARNING") {
+		t.Fatalf("solve --warn-incompatible failed (code=%d): %s", code, out)
+	}
+	out, code = runCLI(t, bin, "doctor", "--dir", warnWS)
+	if code != 0 || !strings.Contains(out, "Dependencies & Version Compatibility:") || !strings.Contains(out, "[WARN]") {
+		t.Fatalf("doctor non-blocking warning check failed (code=%d):\n%s", code, out)
 	}
 
 	// 6. dna validate & diff with trailing --json flag

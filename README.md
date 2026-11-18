@@ -6,21 +6,23 @@
 
 **`grabman`** is the Ecosystem Project Scaffolder, Compatibility Doctor, `Site DNA` Validator, and Deterministic `grabman.lock` Solver for **Step 5 of the Post-1.0 GRAB Ecosystem**.
 
-- **Current Status:** **`v1.0.0` — Complete (Production Freeze)** ([`specifications/GRABMAN-SPEC-100.md`](specifications/GRABMAN-SPEC-100.md) | [Walkthrough PDF](docs/releases/pdf/Grabman-v1.0.0-Guide.pdf) | [Changelog](CHANGELOG.md))
+- **Current Status:** **`v1.1.0` — Complete** ([Walkthrough PDF](docs/releases/pdf/Grabman-v1.1.0-Guide.pdf) | [`v1.0.0` Freeze Spec](specifications/GRABMAN-SPEC-100.md) | [Changelog](CHANGELOG.md))
 - **Development Repo (`origin`):** `https://github.com/urbanspress/grabman.progress`
 - **Production Release Repo (`stable`):** `https://github.com/urbanspress/grabman.stable`
 
 ---
 
-## Core Capabilities (`v1.0.0`)
+## Core Capabilities (`v1.1.0`)
 
-1. **Deterministic Project Scaffolder (`grabman init`):**
-   - Generates clean, `grab check`-ready workspaces (`app`, `cms-stack`, `ai-stack`, or hydrated directly from a **Groxy AI** `--from-site-dna` snapshot) with `grabman.json`, `grabman.lock`, `grab.platform.json`, `grab.data.json`, semantic zero-`<div>` `.grab.html` templates, and `--read-only` Docker Compose baselines.
-   - Strictly confines paths inside the target workspace (`GRAB-E401` parity blocking `.git`, `.env`, `.ssh`, `*.key`, `*.pem`, `id_rsa`, `id_ed25519`, symlinks escaping root, and `..`), refuses partial overwrites without `--force`, and runs zero remote `curl | sh` scripts.
-2. **Plain-English Compatibility & Security Doctor (`grabman doctor`):**
-   - Audits local `GRAB v1.1.0` compilation (`grab check`), `theme/theme.json` `mode: "visual"` exclusivity, frozen contract SHA-256 parity (`grex.elements.json`, `grex.js`, `seo-playbook.v1.json`), container hardening (`read_only: true`, `cap_drop: ["ALL"]`, `no-new-privileges:true`, pinned image tags, `127.0.0.1` loopback bindings), zero hardcoded secrets/private IPs (redacted in all outputs), and `Site DNA` precision. Outputs both plain-English advice and machine-readable `--json` (`--strict`).
+1. **Interactive & Deterministic Project Scaffolder (`grabman init` / `grab init`):**
+   - Works interactively like `npx create-next-app` / `composer init` (while preserving `--non-interactive`, `--profile`, and `--from-site-dna` for CI): runs a **System Prerequisite Gate** (`grab >= 1.1.0`, plus PostgreSQL check when **GrabLab CMS** is chosen), automatically bundles **GRAB** and **Grex JS `v1.0.0`** (`public/grex/`), and prompts only for optional **GrabLab CMS** (`Y/n`) and **Groxy AI** (`y/N`).
+   - Generates canonical Grisp workspaces (`src/app.grab`, `views/index.grab.html`, `views/home.grab.html`, `public/grex/`, `storage/`, `uploads/`, `0600` `.env`, `.env.example`, `deploy/.env.example`, `grabman.json`, `grabman.lock`, `grab.platform.json`, `grab.data.json`, and `--read-only` `deploy/docker-compose.yml`).
+   - Strictly confines paths inside the target workspace (`GRAB-E401` parity blocking `.git`, unexpected `.env` tampering, `.ssh`, `*.key`, `*.pem`, `id_rsa`, `id_ed25519`, symlinks escaping root, and `..`), refuses partial overwrites without `--force`, and runs zero remote `curl | sh` scripts.
+2. **Plain-English Compatibility, Dependencies & Security Doctor (`grabman doctor`):**
+   - Includes a dedicated **`Dependencies & Version Compatibility`** section (and `--json` `dependencies` array) inspecting every layer in `grabman.json` / `grabman.lock` against `EcosystemMatrix()`, emitting non-blocking `WARNING` guidance for intentional incompatible pins while still catching lockfile/contract drift.
+   - Audits local `GRAB v1.1.0` compilation (`grab check`), `theme/theme.json` `mode: "visual"` exclusivity, frozen contract SHA-256 parity (`grex.elements.json`, `grex.js`, `seo-playbook.v1.json`), container hardening (`read_only: true`, `cap_drop: ["ALL"]`, `no-new-privileges:true`, pinned image tags, `127.0.0.1` loopback bindings), zero hardcoded secrets/private IPs (redacted in all outputs), and `Site DNA` precision.
 3. **`grabman.lock` 6-Layer Compatibility Solver (`grabman solve`):**
-   - Resolves and pins SemVer (`ADR-027c`) bounds and SHA-256 contract hashes across all 6 ecosystem layers into deterministic `grabman.lock` files; `solve --verify` fails closed (`exit != 0`) on any lockfile/contract drift, version downgrade, or unapproved jump to `v2.0.0`.
+   - Resolves and pins SemVer (`ADR-027c`) bounds and SHA-256 contract hashes across all 6 ecosystem layers into deterministic `grabman.lock` files; supports `--warn-incompatible` for non-blocking warnings when intentionally testing overridden dependency ranges, while `--verify` fails closed (`exit != 0`) on lockfile/contract drift.
 4. **`Site DNA` Bridge (`grabman dna`):**
    - Validates and diffs portable `groxy-site-dna-v0.4.0` / `v1.0.0` bundles exported from **Groxy AI** (`GET /api/groxy/site-dna/export`), enforcing exact base-10 `ADR-025c` `GrabDecimal`/`GrabInteger` wire strings and rejecting IEEE float drift, `<div>`, `<script>`, `on*`, or unsafe URLs (`javascript:`, `data:`, `vbscript:`).
 

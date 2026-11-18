@@ -3,6 +3,7 @@ package scaffolder
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"grabman/internal/manifest"
@@ -12,25 +13,30 @@ import (
 
 // InitOptions configures `grabman init`.
 type InitOptions struct {
-	TargetDir      string
-	Profile        string
-	ProjectName    string
-	EdgeProxy      string
-	FromSiteDNA    string
-	Force          bool
-	FixedTimestamp string
+	TargetDir       string
+	Profile         string
+	ProjectName     string
+	EdgeProxy       string
+	FromSiteDNA     string
+	Force           bool
+	FixedTimestamp  string
+	GrabBinary      string
+	SkipPrereqGate  bool
+	RequirePostgres bool
+	PrereqHooks     *PrereqOptions
 }
 
 // InitResult summarizes files created by `grabman init`.
 type InitResult struct {
-	SchemaVersion    string   `json:"schema_version"`
-	Workspace        string   `json:"workspace"`
-	ProjectName      string   `json:"project_name"`
-	Profile          string   `json:"profile"`
-	EdgeProxy        string   `json:"edge_proxy"`
-	HydratedSiteDNA  bool     `json:"hydrated_site_dna"`
-	FilesWritten     []string `json:"files_written"`
-	LockDigestSHA256 string   `json:"lock_digest_sha256"`
+	SchemaVersion    string        `json:"schema_version"`
+	Workspace        string        `json:"workspace"`
+	ProjectName      string        `json:"project_name"`
+	Profile          string        `json:"profile"`
+	EdgeProxy        string        `json:"edge_proxy"`
+	HydratedSiteDNA  bool          `json:"hydrated_site_dna"`
+	FilesWritten     []string      `json:"files_written"`
+	LockDigestSHA256 string        `json:"lock_digest_sha256"`
+	Prerequisites    *PrereqStatus `json:"prerequisites,omitempty"`
 }
 
 // Init scaffolds a complete, grab check-ready GRAB Ecosystem workspace with zero remote scripts.
@@ -96,6 +102,28 @@ func Init(opts InitOptions) (*InitResult, error) {
 		return nil, err
 	}
 
+	var prereqPtr *PrereqStatus
+	if !opts.SkipPrereqGate {
+		pOpts := PrereqOptions{
+			GrabBinary:      opts.GrabBinary,
+			RequirePostgres: opts.RequirePostgres,
+		}
+		if opts.PrereqHooks != nil {
+			pOpts = *opts.PrereqHooks
+			if pOpts.GrabBinary == "" {
+				pOpts.GrabBinary = opts.GrabBinary
+			}
+			if !pOpts.RequirePostgres {
+				pOpts.RequirePostgres = opts.RequirePostgres
+			}
+		}
+		status, pErr := CheckPrerequisites(opts.Profile, pOpts)
+		if pErr != nil {
+			return nil, pErr
+		}
+		prereqPtr = &status
+	}
+
 	ctx := buildScaffoldContext(opts, dnaBundle)
 
 	manifestBytes, err := renderManifest(ctx)
@@ -110,6 +138,11 @@ func Init(opts InitOptions) (*InitResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	dotEnvBytes, err := renderDotEnv(ctx)
+	if err != nil {
+		return nil, err
+	}
+	homeHTML := renderHomeTemplate(ctx)
 
 	type fileSpec struct {
 		rel  string
@@ -122,9 +155,16 @@ func Init(opts InitOptions) (*InitResult, error) {
 		{rel: "grab.platform.json", data: platformBytes, opts: manifest.ResolveOptions{AllowMissing: true}},
 		{rel: "grab.data.json", data: dataBytes, opts: manifest.ResolveOptions{AllowMissing: true}},
 		{rel: "src/app.grab", data: renderGrabEntry(ctx), opts: manifest.ResolveOptions{AllowMissing: true}},
-		{rel: "views/home.grab.html", data: renderHomeTemplate(ctx), opts: manifest.ResolveOptions{AllowMissing: true}},
+		{rel: "views/index.grab.html", data: homeHTML, opts: manifest.ResolveOptions{AllowMissing: true}},
+		{rel: "views/home.grab.html", data: homeHTML, opts: manifest.ResolveOptions{AllowMissing: true}},
+		{rel: "public/grex/grex.js", data: embeddedGrexJS, opts: manifest.ResolveOptions{AllowMissing: true}},
+		{rel: "public/grex/tokens.css", data: embeddedGrexTokensCSS, opts: manifest.ResolveOptions{AllowMissing: true}},
+		{rel: "public/grex/grex.elements.json", data: embeddedGrexElementsJSON, opts: manifest.ResolveOptions{AllowMissing: true}},
 		{rel: "public/assets/site.css", data: renderStylesheet(ctx), opts: manifest.ResolveOptions{AllowMissing: true}},
+		{rel: "storage/.gitkeep", data: []byte{}, opts: manifest.ResolveOptions{AllowMissing: true}},
+		{rel: "uploads/.gitkeep", data: []byte{}, opts: manifest.ResolveOptions{AllowMissing: true}},
 		{rel: "deploy/docker-compose.yml", data: renderDockerCompose(ctx), opts: manifest.ResolveOptions{AllowMissing: true}},
+		{rel: ".env.example", data: renderEnvExample(ctx), opts: manifest.ResolveOptions{AllowMissing: true, AllowEnvExample: true}},
 		{rel: "deploy/.env.example", data: renderEnvExample(ctx), opts: manifest.ResolveOptions{AllowMissing: true, AllowEnvExample: true}},
 		{rel: ".gitignore", data: renderGitignore(), opts: manifest.ResolveOptions{AllowMissing: true}},
 	}
@@ -141,7 +181,7 @@ func Init(opts InitOptions) (*InitResult, error) {
 	}
 
 	// Pre-flight confinement and non-overwrite checks before any write occurs.
-	checkTargets := make([]string, 0, len(files)+1)
+	checkTargets := make([]string, 0, len(files)+2)
 	for _, f := range files {
 		abs, _, err := manifest.ResolveWorkspaceFile(realRoot, f.rel, f.opts)
 		if err != nil {
@@ -170,16 +210,27 @@ func Init(opts InitOptions) (*InitResult, error) {
 				"Choose an empty directory or pass --force.",
 			)
 		}
+		if _, statErr := os.Stat(filepath.Join(realRoot, ".env")); statErr == nil {
+			return nil, manifest.NewError(
+				manifest.ErrManifestMalformed,
+				"refusing to overwrite existing \".env\" without --force",
+				"Choose an empty directory or pass --force.",
+			)
+		}
 	}
 	_ = checkTargets
 
-	written := make([]string, 0, len(files)+1)
+	written := make([]string, 0, len(files)+2)
 	for _, f := range files {
 		if err := manifest.WriteFileAtomic(realRoot, f.rel, f.data, f.opts); err != nil {
 			return nil, err
 		}
 		written = append(written, f.rel)
 	}
+	if err := manifest.WriteWorkspaceDotEnv(realRoot, dotEnvBytes); err != nil {
+		return nil, err
+	}
+	written = append(written, ".env")
 
 	solveRes, err := solver.Solve(realRoot, solver.SolveOptions{FixedTimestamp: opts.FixedTimestamp})
 	if err != nil {
@@ -196,5 +247,6 @@ func Init(opts InitOptions) (*InitResult, error) {
 		HydratedSiteDNA:  ctx.FromSiteDNA,
 		FilesWritten:     written,
 		LockDigestSHA256: solveRes.LockDigestSHA256,
+		Prerequisites:    prereqPtr,
 	}, nil
 }

@@ -297,11 +297,35 @@ def render_v100_html() -> str:
     return html
 
 
+def render_v110_html() -> str:
+    html = render_v100_html()
+    replacements = [
+        ("Grabman v1.0.0", "Grabman v1.1.0"),
+        ("v1.0.0 Production Stability Freeze", "MINOR 1.1.0 &mdash; Interactive Scaffolder &amp; Dependency Health"),
+        ("<td><code>1.0.0</code></td>\n          <td>Production-frozen Step 5 contract (dual support for <code>0.1.0</code> &amp; <code>1.0.0</code> schemas)</td>",
+         "<td><code>1.1.0</code></td>\n          <td>Interactive <code>init</code>, system prereq gate (GRAB + Postgres), mandatory <code>public/grex/</code>, non-blocking <code>doctor</code> dependency warnings</td>"),
+        ("Generates ready-to-compile workspaces (<code>app</code>, <code>cms-stack</code>, <code>ai-stack</code>, or hydrated directly via <code>--from-site-dna</code>). Never executes remote shell installers (zero <code>curl | sh</code>) and never overwrites existing files unless <code>--force</code> is supplied.",
+         "Runs an interactive Next.js/Composer-style project survey (while keeping <code>--non-interactive</code> &amp; <code>--profile</code> for CI), enforces the System Prerequisite Gate (<code>grab &gt;= 1.1.0</code> + PostgreSQL check when GrabLab CMS is picked), bundles mandatory <strong>GRAB + Grex JS v1.0.0</strong> (<code>public/grex/</code>), and prompts only for optional GrabLab CMS and Groxy AI."),
+        ("<code>grabman doctor [--strict] [--json]</code> &mdash; Audits installed GRAB runtime, workspace configs, theme mode rules, Site DNA exact decimals, template hygiene, and Docker Compose security settings, returning plain-English remediation steps.",
+         "<code>grabman doctor [--strict] [--json]</code> &mdash; Includes a dedicated <strong>Dependencies &amp; Version Compatibility</strong> audit table (and JSON <code>dependencies</code> array) plus non-blocking warnings for overridden dependency pins, alongside live <code>grab check</code>, Site DNA exact decimals, template hygiene, and Compose security."),
+        ("<code>grabman solve [--verify]</code> &mdash; Computes a deterministic 6-layer compatibility lockfile (<code>grabman.lock</code>) and pinned SHA-256 artifact checksums. Passing <code>--verify</code> is strictly read-only and exits non-zero immediately on any drift or unapproved major jump to <code>v2.0.0</code>.",
+         "<code>grabman solve [--verify] [--warn-incompatible]</code> &mdash; Computes a deterministic 6-layer compatibility lockfile (<code>grabman.lock</code>). Supports non-blocking <code>--warn-incompatible</code> notices for intentional pins, while <code>--verify</code> fails closed on drift or unapproved <code>v2.0.0</code> jumps."),
+        ("<strong>Generated Workspace Layout:</strong> Produces <code>grabman.json</code>, <code>grabman.lock</code>, <code>grab.platform.json</code>, <code>grab.data.json</code>, <code>src/app.grab</code>, semantic zero-<code>&lt;div&gt;</code> <code>views/home.grab.html</code>, externalized tokens stylesheet <code>public/assets/site.css</code>, optional <code>theme/theme.json</code> (<code>\"mode\": \"visual\"</code>), hardened <code>deploy/docker-compose.yml</code>, placeholder-only <code>deploy/.env.example</code>, and safe <code>.gitignore</code>.",
+         "<strong>Canonical Grisp Workspace Layout:</strong> Produces <code>src/app.grab</code>, zero-<code>&lt;div&gt;</code> <code>views/index.grab.html</code> &amp; <code>views/home.grab.html</code>, bundled Grex JS assets (<code>public/grex/grex.js</code>, <code>tokens.css</code>, <code>grex.elements.json</code>), <code>storage/</code>, <code>uploads/</code>, symlink-confined <code>0600</code> <code>.env</code>, <code>.env.example</code>, <code>deploy/.env.example</code>, <code>grabman.json</code>, <code>grabman.lock</code>, <code>grab.platform.json</code>, <code>grab.data.json</code>, and hardened <code>--read-only</code> <code>deploy/docker-compose.yml</code>."),
+        ("Step 5 Layer 1 Production Freeze (Synchronized with Grabtaculous v1.0.0 &amp; Gashboard v1.0.0)",
+         "Step 5 v1.1.0 Interactive Scaffolder &amp; Dependency Doctor (Paired with GRAB v1.1.0 grab init &amp; Grabtaculous v1.1.0)"),
+    ]
+    for old, new in replacements:
+        html = html.replace(old, new)
+    return html
+
+
 def main():
     version = sys.argv[1].lstrip("v") if len(sys.argv) > 1 else "1.0.0"
     renderers = {
         "0.1.0": render_v010_html,
         "1.0.0": render_v100_html,
+        "1.1.0": render_v110_html,
     }
     if version not in renderers:
         raise ValueError(f"Unsupported guide version '{version}'. Available: {', '.join(sorted(renderers))}")

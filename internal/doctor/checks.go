@@ -53,13 +53,14 @@ type ReportSummary struct {
 
 // Report is the complete structured output of `grabman doctor`.
 type Report struct {
-	SchemaVersion string        `json:"schema_version"`
-	Status        Status        `json:"status"`
-	Workspace     string        `json:"workspace"`
-	GrabBinary    string        `json:"grab_binary,omitempty"`
-	GrabVersion   string        `json:"grab_version,omitempty"`
-	Summary       ReportSummary `json:"summary"`
-	Checks        []CheckItem   `json:"checks"`
+	SchemaVersion string                   `json:"schema_version"`
+	Status        Status                   `json:"status"`
+	Workspace     string                   `json:"workspace"`
+	GrabBinary    string                   `json:"grab_binary,omitempty"`
+	GrabVersion   string                   `json:"grab_version,omitempty"`
+	Summary       ReportSummary            `json:"summary"`
+	Dependencies  []solver.DependencyAudit `json:"dependencies"`
+	Checks        []CheckItem              `json:"checks"`
 }
 
 // Options configures doctor execution (allowing clean unit testing).
@@ -86,6 +87,7 @@ func Run(workspaceDir string, opts Options) (*Report, error) {
 	rep := &Report{
 		SchemaVersion: manifest.SchemaVersionV100,
 		Workspace:     realRoot,
+		Dependencies:  []solver.DependencyAudit{},
 		Checks:        []CheckItem{},
 	}
 
@@ -98,10 +100,20 @@ func Run(workspaceDir string, opts Options) (*Report, error) {
 	// 2. Optional companion runtimes (Docker / Node informational)
 	rep.Checks = append(rep.Checks, checkOptionalTools())
 
-	// 3. Manifest + Lockfile verification
+	// 3. Manifest + Dependencies & Version Compatibility + Lockfile verification
 	m, manifestCheck := checkManifest(realRoot)
 	rep.Checks = append(rep.Checks, manifestCheck)
-	rep.Checks = append(rep.Checks, checkLockfile(realRoot))
+	if m != nil {
+		installed := map[string]string{}
+		if grabVer != "" {
+			installed["grab"] = grabVer
+		}
+		if deps, depErr := solver.InspectDependencies(realRoot, installed); depErr == nil {
+			rep.Dependencies = deps
+			rep.Checks = append(rep.Checks, checkDependencyCompatibility(deps))
+		}
+	}
+	rep.Checks = append(rep.Checks, checkLockfile(realRoot, rep.Dependencies))
 
 	// 4. GRAB JSON configs & Theme mode checks
 	rep.Checks = append(rep.Checks, checkWorkspaceConfigs(realRoot, m)...)
@@ -317,9 +329,73 @@ func checkManifest(realRoot string) (*manifest.Manifest, CheckItem) {
 	}
 }
 
-func checkLockfile(realRoot string) CheckItem {
+func checkDependencyCompatibility(deps []solver.DependencyAudit) CheckItem {
+	var warns []string
+	var blocked []string
+	for _, d := range deps {
+		switch d.Status {
+		case "warning":
+			warns = append(warns, fmt.Sprintf("%s: %s", d.Layer, d.Message))
+		case "blocked":
+			blocked = append(blocked, fmt.Sprintf("%s: %s", d.Layer, d.Message))
+		}
+	}
+	if len(blocked) > 0 {
+		return CheckItem{
+			ID:           "dependencies.compatibility",
+			Code:         string(manifest.ErrSemVerViolation),
+			Status:       StatusBlocked,
+			Title:        "Dependencies & Version Compatibility",
+			PlainEnglish: strings.Join(blocked, " "),
+			Remediation:  "Update grabman.json target_runtime constraints to stay within the approved <2.0.0 ecosystem contract line (ADR-027c).",
+		}
+	}
+	if len(warns) > 0 {
+		return CheckItem{
+			ID:           "dependencies.compatibility",
+			Status:       StatusWarning,
+			Title:        "Dependencies & Version Compatibility",
+			PlainEnglish: strings.Join(warns, " "),
+			Remediation:  "Run 'grabman solve --warn-incompatible' to continue with pinned overrides, or align grabman.json with recommended ranges.",
+		}
+	}
+	return CheckItem{
+		ID:           "dependencies.compatibility",
+		Status:       StatusPass,
+		Title:        "Dependencies & Version Compatibility",
+		PlainEnglish: fmt.Sprintf("All %d ecosystem dependency layers satisfy compatibility matrix constraints.", len(deps)),
+	}
+}
+
+func checkLockfile(realRoot string, deps []solver.DependencyAudit) CheckItem {
 	res, err := solver.Verify(realRoot, solver.SolveOptions{})
 	if err != nil {
+		if solver.HasIncompatiblePinWarning(deps) {
+			if existing, _, loadErr := manifest.LoadLockfile(realRoot); loadErr == nil {
+				if computed, hashErr := existing.ComputeLockDigestSHA256(); hashErr == nil && computed == existing.LockDigestSHA256 {
+					warnRes, warnErr := solver.Verify(realRoot, solver.SolveOptions{WarnIncompatible: true})
+					if warnErr == nil {
+						return CheckItem{
+							ID:           "workspace.lockfile",
+							Status:       StatusWarning,
+							Title:        "grabman.lock Integrity & 6-Layer Matrix",
+							PlainEnglish: strings.Join(warnRes.Warnings, " "),
+							Remediation:  "Update target_runtime in grabman.json to baseline >= versions when ready, or continue using --warn-incompatible.",
+						}
+					}
+					if warnRes != nil && onlyGrabmanJSONOverrideDrift(warnRes.DriftDetails) {
+						return CheckItem{
+							ID:           "workspace.lockfile",
+							Status:       StatusWarning,
+							Title:        "grabman.lock Integrity & 6-Layer Matrix",
+							PlainEnglish: fmt.Sprintf("WARNING: grabman.json pins an incompatible dependency override (%v).", warnErr),
+							Remediation:  fmt.Sprintf("Run 'grabman solve --warn-incompatible --dir %q' to update grabman.lock with your pinned override.", realRoot),
+						}
+					}
+				}
+			}
+		}
+
 		code := string(manifest.ExtractCode(err))
 		if code == "" {
 			code = string(manifest.ErrManifestMalformed)
@@ -339,6 +415,22 @@ func checkLockfile(realRoot string) CheckItem {
 		Title:        "grabman.lock Integrity & 6-Layer Matrix",
 		PlainEnglish: fmt.Sprintf("grabman.lock verified cleanly across all 6 ecosystem layers (digest %s).", res.LockDigestSHA256[:12]),
 	}
+}
+
+func onlyGrabmanJSONOverrideDrift(drifts []string) bool {
+	if len(drifts) == 0 {
+		return false
+	}
+	for _, d := range drifts {
+		if strings.Contains(d, `"workspace:grabman.json"`) {
+			continue
+		}
+		if strings.HasPrefix(d, "layer ") && strings.Contains(d, " drifted ") {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func checkWorkspaceConfigs(realRoot string, m *manifest.Manifest) []CheckItem {

@@ -52,7 +52,7 @@ func EcosystemMatrix() []LayerSpec {
 			BaselineMin: "1.0.1",
 			DefaultExpr: ">=1.0.1 <2.0.0",
 			SemVerTier:  "v1.x",
-			Available:   []string{"1.0.1"},
+			Available:   []string{"1.0.1", "1.1.0", "1.4.0", "1.4.1"},
 		},
 		{
 			Key:         "grex-builder",
@@ -79,16 +79,30 @@ func EcosystemMatrix() []LayerSpec {
 			BaselineMin: "0.1.0",
 			DefaultExpr: ">=0.1.0 <2.0.0",
 			SemVerTier:  "1.x-frozen",
-			Available:   []string{"0.1.0", "0.2.0", "0.3.0", "1.0.0"},
+			Available:   []string{"0.1.0", "0.2.0", "0.3.0", "1.0.0", "1.1.0"},
 		},
 	}
 }
 
 // SolveOptions controls solver execution and deterministic timestamps.
 type SolveOptions struct {
-	FixedTimestamp string
-	Now            func() time.Time
-	ExtraReleases  map[string][]string // optional override for testing multi-version resolution
+	FixedTimestamp   string
+	Now              func() time.Time
+	ExtraReleases    map[string][]string // optional override for testing multi-version resolution
+	WarnIncompatible bool                // emit non-blocking warnings instead of failing when <2.0.0 pin falls below BaselineMin
+}
+
+// DependencyAudit reports compatibility status for a single ecosystem layer.
+type DependencyAudit struct {
+	Layer      string `json:"layer"`
+	Repo       string `json:"repo"`
+	Configured string `json:"configured"`
+	Locked     string `json:"locked,omitempty"`
+	Expected   string `json:"expected"`
+	Installed  string `json:"installed,omitempty"`
+	Compatible bool   `json:"compatible"`
+	Status     string `json:"status"` // "compatible", "warning", "blocked"
+	Message    string `json:"message"`
 }
 
 // VerifyResult captures the outcome of `grabman solve --verify`.
@@ -98,6 +112,7 @@ type VerifyResult struct {
 	Deterministic    bool     `json:"deterministic"`
 	Workspace        string   `json:"workspace"`
 	LockDigestSHA256 string   `json:"lock_digest_sha256"`
+	Warnings         []string `json:"warnings,omitempty"`
 	DriftDetails     []string `json:"drift_details,omitempty"`
 	Code             string   `json:"code,omitempty"`
 	Error            string   `json:"error,omitempty"`
@@ -110,6 +125,7 @@ type SolveResult struct {
 	Workspace        string             `json:"workspace"`
 	LockfilePath     string             `json:"lockfile_path"`
 	LockDigestSHA256 string             `json:"lock_digest_sha256"`
+	Warnings         []string           `json:"warnings,omitempty"`
 	Lockfile         *manifest.Lockfile `json:"lockfile"`
 }
 
@@ -133,13 +149,20 @@ func resolveTimestamp(opts SolveOptions, existing *manifest.Lockfile, newDigest 
 
 // ComputeLockfile resolves the 6-layer matrix and hashes workspace contracts purely read-only.
 func ComputeLockfile(workspaceRoot string, opts SolveOptions) (*manifest.Lockfile, error) {
+	lock, _, err := ComputeLockfileWithWarnings(workspaceRoot, opts)
+	return lock, err
+}
+
+// ComputeLockfileWithWarnings resolves the 6-layer matrix and returns optional non-blocking
+// compatibility warnings when opts.WarnIncompatible is enabled.
+func ComputeLockfileWithWarnings(workspaceRoot string, opts SolveOptions) (*manifest.Lockfile, []string, error) {
 	realRoot, err := manifest.ResolveWorkspaceRoot(workspaceRoot)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	m, _, err := manifest.LoadManifest(realRoot)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	knownAliases := map[string]struct{}{}
@@ -151,7 +174,7 @@ func ComputeLockfile(workspaceRoot string, opts SolveOptions) (*manifest.Lockfil
 	}
 	for k := range m.TargetRuntime {
 		if _, ok := knownAliases[k]; !ok {
-			return nil, manifest.NewError(
+			return nil, nil, manifest.NewError(
 				manifest.ErrSemVerViolation,
 				fmt.Sprintf("unknown layer %q in grabman.json target_runtime", k),
 				"Use supported layer keys: grab, grex_js, grablab_cms, grex_builder, groxy_ai, grabtaculous, gashboard, grabman.",
@@ -159,6 +182,8 @@ func ComputeLockfile(workspaceRoot string, opts SolveOptions) (*manifest.Lockfil
 		}
 	}
 
+	var warnings []string
+	compatibleAll := true
 	layers := make(map[string]manifest.LockedLayer, len(matrix))
 	for _, spec := range matrix {
 		boundList, exprSummary := collectLayerConstraints(m.TargetRuntime, spec)
@@ -166,14 +191,14 @@ func ComputeLockfile(workspaceRoot string, opts SolveOptions) (*manifest.Lockfil
 		for _, expr := range boundList {
 			cs, parseErr := ParseConstraint(expr)
 			if parseErr != nil {
-				return nil, parseErr
+				return nil, nil, parseErr
 			}
 			parsedBounds = append(parsedBounds, cs)
 		}
 
 		minVer, err := ParseSemVer(spec.BaselineMin)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		candidates := spec.Available
@@ -181,39 +206,25 @@ func ComputeLockfile(workspaceRoot string, opts SolveOptions) (*manifest.Lockfil
 			candidates = opts.ExtraReleases[spec.Key]
 		}
 
-		var chosen *SemVer
-		for _, candStr := range candidates {
-			cand, parseErr := ParseSemVer(candStr)
-			if parseErr != nil {
-				return nil, parseErr
-			}
-			if cand.Major >= 2 {
-				return nil, manifest.NewError(
-					manifest.ErrSemVerViolation,
-					fmt.Sprintf("ADR-027c violation: candidate %s@%s crosses v2.0.0 major boundary", spec.Key, candStr),
-					"Require explicit project-owner approval before targeting v2.0.0.",
-				)
-			}
-			if cand.Compare(minVer) < 0 {
-				continue
-			}
-			allMatch := true
-			for _, cs := range parsedBounds {
-				if !cs.Matches(cand) {
-					allMatch = false
-					break
-				}
-			}
-			if allMatch {
-				cCopy := cand
-				if chosen == nil || cCopy.Compare(*chosen) > 0 {
-					chosen = &cCopy
-				}
+		chosen, err := selectBestCandidate(spec.Key, candidates, &minVer, parsedBounds)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if chosen == nil && opts.WarnIncompatible {
+			fallback := resolveFallbackVersion(candidates, parsedBounds)
+			if fallback != nil {
+				chosen = fallback
+				compatibleAll = false
+				warnings = append(warnings, fmt.Sprintf(
+					"WARNING: %s is pinned/constrained to %s (%q), expected %s (below ecosystem baseline >=%s <2.0.0). Continuing in non-blocking mode.",
+					spec.Key, chosen.String(), exprSummary, spec.DefaultExpr, spec.BaselineMin,
+				))
 			}
 		}
 
 		if chosen == nil {
-			return nil, manifest.NewError(
+			return nil, nil, manifest.NewError(
 				manifest.ErrSemVerViolation,
 				fmt.Sprintf("incompatible 6-layer constraint for %s (%q): requires baseline >=%s and <2.0.0 (ADR-027c)", spec.Key, exprSummary, spec.BaselineMin),
 				fmt.Sprintf("Update target_runtime for %s in grabman.json to allow >=%s <2.0.0.", spec.Key, spec.BaselineMin),
@@ -232,7 +243,7 @@ func ComputeLockfile(workspaceRoot string, opts SolveOptions) (*manifest.Lockfil
 
 	contracts, err := collectWorkspaceContracts(realRoot, m)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	lockSchemaVersion := strings.TrimSpace(m.SchemaVersion)
@@ -246,14 +257,89 @@ func ComputeLockfile(workspaceRoot string, opts SolveOptions) (*manifest.Lockfil
 		Profile:               m.Profile,
 		Layers:                layers,
 		Contracts:             contracts,
-		CompatibilityVerified: true,
+		CompatibilityVerified: compatibleAll,
 	}
 	digest, err := lock.ComputeLockDigestSHA256()
 	if err != nil {
-		return nil, manifest.WrapError(manifest.ErrManifestMalformed, "failed to compute deterministic lock digest", "Retry grabman solve.", err)
+		return nil, nil, manifest.WrapError(manifest.ErrManifestMalformed, "failed to compute deterministic lock digest", "Retry grabman solve.", err)
 	}
 	lock.LockDigestSHA256 = digest
-	return lock, nil
+	return lock, warnings, nil
+}
+
+func selectBestCandidate(layerKey string, candidates []string, minVer *SemVer, parsedBounds []ConstraintSet) (*SemVer, error) {
+	var chosen *SemVer
+	for _, candStr := range candidates {
+		cand, parseErr := ParseSemVer(candStr)
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		if cand.Major >= 2 {
+			return nil, manifest.NewError(
+				manifest.ErrSemVerViolation,
+				fmt.Sprintf("ADR-027c violation: candidate %s@%s crosses v2.0.0 major boundary", layerKey, candStr),
+				"Require explicit project-owner approval before targeting v2.0.0.",
+			)
+		}
+		if minVer != nil && cand.Compare(*minVer) < 0 {
+			continue
+		}
+		if allConstraintsMatch(parsedBounds, cand) {
+			cCopy := cand
+			if chosen == nil || cCopy.Compare(*chosen) > 0 {
+				chosen = &cCopy
+			}
+		}
+	}
+	return chosen, nil
+}
+
+func resolveFallbackVersion(candidates []string, parsedBounds []ConstraintSet) *SemVer {
+	var pool []SemVer
+	for _, cStr := range candidates {
+		if sv, err := ParseSemVer(cStr); err == nil && sv.Major < 2 {
+			pool = append(pool, sv)
+		}
+	}
+	for _, fallbackStr := range []string{"0.1.0", "0.2.0", "0.3.0", "1.0.0", "1.0.1", "1.1.0"} {
+		if sv, err := ParseSemVer(fallbackStr); err == nil {
+			pool = append(pool, sv)
+		}
+	}
+	for _, cs := range parsedBounds {
+		for _, comp := range cs.Comparators {
+			if comp.ver.Major < 2 {
+				pool = append(pool, comp.ver)
+				if comp.op == "<" && comp.ver.Patch > 0 {
+					pool = append(pool, SemVer{Major: comp.ver.Major, Minor: comp.ver.Minor, Patch: comp.ver.Patch - 1})
+				} else if comp.op == "<" && comp.ver.Minor > 0 {
+					pool = append(pool, SemVer{Major: comp.ver.Major, Minor: comp.ver.Minor - 1, Patch: 0})
+				}
+			}
+		}
+	}
+	var chosen *SemVer
+	for _, cand := range pool {
+		if cand.Major >= 2 {
+			continue
+		}
+		if allConstraintsMatch(parsedBounds, cand) {
+			cCopy := cand
+			if chosen == nil || cCopy.Compare(*chosen) > 0 {
+				chosen = &cCopy
+			}
+		}
+	}
+	return chosen
+}
+
+func allConstraintsMatch(bounds []ConstraintSet, cand SemVer) bool {
+	for _, cs := range bounds {
+		if !cs.Matches(cand) {
+			return false
+		}
+	}
+	return true
 }
 
 func collectLayerConstraints(runtimeMap map[string]string, spec LayerSpec) ([]string, string) {
@@ -416,7 +502,7 @@ func Solve(workspaceRoot string, opts SolveOptions) (*SolveResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	lock, err := ComputeLockfile(realRoot, opts)
+	lock, warnings, err := ComputeLockfileWithWarnings(realRoot, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -440,6 +526,7 @@ func Solve(workspaceRoot string, opts SolveOptions) (*SolveResult, error) {
 		Workspace:        realRoot,
 		LockfilePath:     lockPath,
 		LockDigestSHA256: lock.LockDigestSHA256,
+		Warnings:         warnings,
 		Lockfile:         lock,
 	}, nil
 }
@@ -455,12 +542,16 @@ func Verify(workspaceRoot string, opts SolveOptions) (*VerifyResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	var verifyWarnings []string
 	if !existing.CompatibilityVerified {
-		return nil, manifest.NewError(
-			manifest.ErrChecksumMismatch,
-			"grabman.lock has compatibility_verified=false",
-			"Run 'grabman solve' to resolve a verified lockfile.",
-		)
+		if !opts.WarnIncompatible {
+			return nil, manifest.NewError(
+				manifest.ErrChecksumMismatch,
+				"grabman.lock has compatibility_verified=false",
+				"Run 'grabman solve' to resolve a verified lockfile.",
+			)
+		}
+		verifyWarnings = append(verifyWarnings, "WARNING: grabman.lock records non-standard pinned dependency overrides (compatibility_verified=false).")
 	}
 	computedExistingDigest, err := existing.ComputeLockDigestSHA256()
 	if err != nil {
@@ -474,10 +565,11 @@ func Verify(workspaceRoot string, opts SolveOptions) (*VerifyResult, error) {
 		)
 	}
 
-	fresh, err := ComputeLockfile(realRoot, opts)
+	fresh, freshWarnings, err := ComputeLockfileWithWarnings(realRoot, opts)
 	if err != nil {
 		return nil, err
 	}
+	verifyWarnings = append(verifyWarnings, freshWarnings...)
 
 	var drifts []string
 	if existing.ProjectName != fresh.ProjectName {
@@ -528,6 +620,7 @@ func Verify(workspaceRoot string, opts SolveOptions) (*VerifyResult, error) {
 			Deterministic:    false,
 			Workspace:        realRoot,
 			LockDigestSHA256: existing.LockDigestSHA256,
+			Warnings:         verifyWarnings,
 			DriftDetails:     drifts,
 			Code:             string(manifest.ErrChecksumMismatch),
 			Error:            fmt.Sprintf("%s: grabman.lock verification failed (%s)", manifest.ErrChecksumMismatch, strings.Join(drifts, "; ")),
@@ -545,7 +638,152 @@ func Verify(workspaceRoot string, opts SolveOptions) (*VerifyResult, error) {
 		Deterministic:    true,
 		Workspace:        realRoot,
 		LockDigestSHA256: existing.LockDigestSHA256,
+		Warnings:         verifyWarnings,
 	}, nil
+}
+
+// InspectDependencies evaluates every ecosystem layer in grabman.json / grabman.lock
+// against EcosystemMatrix() and optional installed version strings without mutating files.
+func InspectDependencies(workspaceRoot string, installedVersions map[string]string) ([]DependencyAudit, error) {
+	realRoot, err := manifest.ResolveWorkspaceRoot(workspaceRoot)
+	if err != nil {
+		return nil, err
+	}
+	m, _, err := manifest.LoadManifest(realRoot)
+	if err != nil {
+		return nil, err
+	}
+	existingLock, _, _ := manifest.LoadLockfile(realRoot)
+
+	matrix := EcosystemMatrix()
+	out := make([]DependencyAudit, 0, len(matrix))
+	for _, spec := range matrix {
+		boundList, exprSummary := collectLayerConstraints(m.TargetRuntime, spec)
+		lockedVer := ""
+		if existingLock != nil {
+			if l, ok := existingLock.Layers[spec.Key]; ok {
+				lockedVer = l.Version
+			}
+		}
+		installedVer := ""
+		if installedVersions != nil {
+			if v := strings.TrimSpace(installedVersions[spec.Key]); v != "" {
+				installedVer = v
+			} else {
+				for _, alias := range spec.Aliases {
+					if v := strings.TrimSpace(installedVersions[alias]); v != "" {
+						installedVer = v
+						break
+					}
+				}
+			}
+		}
+
+		item := DependencyAudit{
+			Layer:      spec.Key,
+			Repo:       spec.Repo,
+			Configured: exprSummary,
+			Locked:     lockedVer,
+			Expected:   spec.DefaultExpr,
+			Installed:  installedVer,
+		}
+
+		var parsedBounds []ConstraintSet
+		var parseErr error
+		for _, expr := range boundList {
+			cs, pErr := ParseConstraint(expr)
+			if pErr != nil {
+				parseErr = pErr
+				break
+			}
+			parsedBounds = append(parsedBounds, cs)
+		}
+		if parseErr != nil {
+			item.Status = "blocked"
+			item.Compatible = false
+			item.Message = fmt.Sprintf("Constraint %q violates ADR-027c SemVer policy (expected %s): %v", exprSummary, spec.DefaultExpr, parseErr)
+			out = append(out, item)
+			continue
+		}
+
+		minVer, _ := ParseSemVer(spec.BaselineMin)
+		chosen, _ := selectBestCandidate(spec.Key, spec.Available, &minVer, parsedBounds)
+		if chosen == nil {
+			fallback := resolveFallbackVersion(spec.Available, parsedBounds)
+			item.Status = "warning"
+			item.Compatible = false
+			if fallback != nil {
+				item.Message = fmt.Sprintf("WARNING: Configured %q resolves to %s, outside expected %s (below baseline >=%s).", exprSummary, fallback.String(), spec.DefaultExpr, spec.BaselineMin)
+			} else {
+				item.Message = fmt.Sprintf("WARNING: Configured %q does not match any supported baseline release (%s).", exprSummary, spec.DefaultExpr)
+			}
+			out = append(out, item)
+			continue
+		}
+
+		if installedVer != "" {
+			instSV, instErr := ParseSemVer(installedVer)
+			if instErr != nil {
+				item.Status = "warning"
+				item.Compatible = false
+				item.Message = fmt.Sprintf("WARNING: Installed version %q is not strict SemVer (expected %s).", installedVer, spec.DefaultExpr)
+				out = append(out, item)
+				continue
+			}
+			if instSV.Major >= 2 {
+				item.Status = "blocked"
+				item.Compatible = false
+				item.Message = fmt.Sprintf("Installed version v%s crosses unapproved v2.0.0 boundary (expected %s).", instSV.String(), spec.DefaultExpr)
+				out = append(out, item)
+				continue
+			}
+			if instSV.Compare(minVer) < 0 || !allConstraintsMatch(parsedBounds, instSV) {
+				item.Status = "warning"
+				item.Compatible = false
+				item.Message = fmt.Sprintf("WARNING: Installed v%s does not satisfy %q / expected %s.", instSV.String(), exprSummary, spec.DefaultExpr)
+				out = append(out, item)
+				continue
+			}
+		}
+
+		if lockedVer != "" {
+			lSV, lErr := ParseSemVer(lockedVer)
+			if lErr != nil || lSV.Compare(minVer) < 0 || !allConstraintsMatch(parsedBounds, lSV) {
+				item.Status = "warning"
+				item.Compatible = false
+				item.Message = fmt.Sprintf("WARNING: Locked version %s differs from configured %q (expected %s). Run 'grabman solve --warn-incompatible' or update grabman.json.", lockedVer, exprSummary, spec.DefaultExpr)
+				out = append(out, item)
+				continue
+			}
+		}
+
+		item.Status = "compatible"
+		item.Compatible = true
+		if installedVer != "" {
+			item.Message = fmt.Sprintf("Compatible: installed v%s satisfies %s.", installedVer, spec.DefaultExpr)
+		} else if lockedVer != "" {
+			item.Message = fmt.Sprintf("Compatible: locked v%s satisfies %s.", lockedVer, spec.DefaultExpr)
+		} else {
+			item.Message = fmt.Sprintf("Compatible: %q satisfies %s.", exprSummary, spec.DefaultExpr)
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+// HasIncompatiblePinWarning returns true iff deps contain non-blocking compatibility warnings
+// and zero hard-blocked dependency violations.
+func HasIncompatiblePinWarning(deps []DependencyAudit) bool {
+	hasWarn := false
+	for _, d := range deps {
+		if d.Status == "blocked" {
+			return false
+		}
+		if d.Status == "warning" {
+			hasWarn = true
+		}
+	}
+	return hasWarn
 }
 
 func sortedLayerKeys(m map[string]manifest.LockedLayer) []string {

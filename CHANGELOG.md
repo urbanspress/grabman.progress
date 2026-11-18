@@ -4,6 +4,24 @@ All notable changes to **`grabman`** follow strict Semantic Versioning (`MAJOR.M
 
 ---
 
+## `v1.1.0` — Interactive Scaffolder, System Prerequisite Gate & Non-Blocking Dependency Health (2026-11-18)
+
+- **SemVer Tier:** `MINOR 1.x.0 — Backwards-Compatible Feature Release` (`100%` backwards compatible with `v0.1.0` and `v1.0.0` manifests, lockfiles, and CLI flags)
+- **Ecosystem Impact:** Zero breaking changes to frozen upstream `v1.x` contracts (`GRAB v1.1.0`, `Grex JS v1.0.0`, `Grex Theme Builder v1.0.0`, `Groxy AI v1.0.0+`). Recognizes `GrabLab CMS v1.1.0`, `v1.4.0`, and `v1.4.1`, plus `Step 5 v1.1.0`.
+
+### Added & Changed
+- **Next.js / Composer-Style Interactive `grabman init` (`internal/scaffolder/prereq.go`, `cmd/grabman/main.go`):**
+  - Added interactive prompt flow (`--interactive` auto-detected on TTY or forced via flag; `--non-interactive` / `--profile` preserved for CI) automatically bundling **GRAB `>=1.1.0`** and **Grex JS `v1.0.0`** (`public/grex/grex.js`, `public/grex/tokens.css`, `public/grex/grex.elements.json`) and prompting only for optional **GrabLab CMS** (`Y/n`) and **Groxy AI** (`y/N`).
+  - Added **System Prerequisite Gate** checking `grab >= 1.1.0` (customizable via `--grab-bin`) and PostgreSQL (`psql` / `pg_isready` / Docker Postgres service) whenever GrabLab CMS is selected, printing plain-English setup steps if missing.
+  - Upgraded scaffold layout to canonical Grisp structure (`src/app.grab`, `views/index.grab.html`, `views/home.grab.html`, `public/grex/*`, `storage/`, `uploads/`, symlink-confined `0600` `.env`, `.env.example`, `deploy/.env.example`, and `--read-only` `deploy/docker-compose.yml` mounting `--static /app/public` and `app-uploads`).
+- **Dependency Health Section & Non-Blocking Incompatible-Pin Warnings (`internal/doctor/`, `internal/solver/`):**
+  - Added `Dependencies & Version Compatibility` plain-English section and `--json` `dependencies` array to `grabman doctor` auditing every layer against `EcosystemMatrix()`.
+  - Added `--warn-incompatible` (`SolveOptions.WarnIncompatible`, `ComputeLockfileWithWarnings`, `InspectDependencies`) so intentional incompatible dependency overrides in `grabman.json` emit clear non-blocking `WARNING` notices instead of breaking local workflows, while contract/lock tampering continues to fail closed.
+- **Cross-Platform Release Artifacts:**
+  - Built static `CGO_ENABLED=0` binaries for `windows/amd64`, `linux/amd64`, and `linux/arm64`, alongside [`docs/releases/pdf/Grabman-v1.1.0-Guide.pdf`](docs/releases/pdf/Grabman-v1.1.0-Guide.pdf), `grabman-v1.1.0-bundle.zip`, and `SHA256SUMS.txt`.
+
+---
+
 ## `v1.0.0` — Step 5 Production Stability Freeze (2026-11-15)
 
 - **SemVer Tier:** `v1.0.0 — Production Stability Freeze` (`100%` backwards compatible with `v0.1.0` manifests, lockfiles, and CLI outputs)

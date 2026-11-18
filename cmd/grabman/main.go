@@ -18,7 +18,7 @@ import (
 )
 
 // Version identifies the release version (overridable via -ldflags "-X main.Version=...").
-var Version = "1.0.0"
+var Version = "1.1.0"
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
@@ -58,9 +58,9 @@ func printUsage(w io.Writer) {
 	fmt.Fprint(w, `grabman v`+Version+` — Post-1.0 GRAB Ecosystem Scaffolder, Doctor & Lock Solver
 
 Usage:
-  grabman init   [--dir <path>] [--profile app|cms-stack|ai-stack] [--name <name>] [--edge-proxy caddy|nginx|cloudflare-tunnel] [--from-site-dna <file.json>] [--force] [--json]
+  grabman init   [--dir <path>] [--profile app|cms-stack|ai-stack] [--name <name>] [--edge-proxy caddy|nginx|cloudflare-tunnel] [--from-site-dna <file.json>] [--interactive|--non-interactive] [--grab-bin <path>] [--require-postgres] [--force] [--json]
   grabman doctor [--dir <path>] [--strict] [--grab-bin <path>] [--json]
-  grabman solve  [--dir <path>] [--verify] [--fixed-timestamp <RFC3339>] [--json]
+  grabman solve  [--dir <path>] [--verify] [--warn-incompatible] [--fixed-timestamp <RFC3339>] [--json]
   grabman dna validate <file.json> [--json]
   grabman dna diff <old.json> <new.json> [--json]
   grabman version [--json]
@@ -90,7 +90,25 @@ func cmdVersion(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+func isInteractiveTTY(f *os.File) bool {
+	if f == nil {
+		return false
+	}
+	fi, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return (fi.Mode() & os.ModeCharDevice) != 0
+}
+
 func cmdInit(args []string, stdout, stderr io.Writer) int {
+	for _, a := range args {
+		if a == "-h" || a == "--help" {
+			printUsage(stdout)
+			return 0
+		}
+	}
+
 	reordered := reorderFlags(args, map[string]bool{
 		"dir":             true,
 		"profile":         true,
@@ -98,6 +116,7 @@ func cmdInit(args []string, stdout, stderr io.Writer) int {
 		"edge-proxy":      true,
 		"from-site-dna":   true,
 		"fixed-timestamp": true,
+		"grab-bin":        true,
 	})
 
 	fs := flag.NewFlagSet("init", flag.ContinueOnError)
@@ -109,6 +128,10 @@ func cmdInit(args []string, stdout, stderr io.Writer) int {
 	fromDNA := fs.String("from-site-dna", "", "Optional Groxy AI Site DNA JSON export to hydrate tokens & catalog")
 	force := fs.Bool("force", false, "Overwrite existing scaffold files")
 	fixedTS := fs.String("fixed-timestamp", "", "Deterministic UTC RFC3339 timestamp override for grabman.lock")
+	interactive := fs.Bool("interactive", false, "Run Next.js/Composer-style interactive project setup")
+	nonInteractive := fs.Bool("non-interactive", false, "Disable interactive survey prompts")
+	grabBin := fs.String("grab-bin", "", "Optional explicit path to GRAB CLI executable")
+	requirePG := fs.Bool("require-postgres", false, "Fail if PostgreSQL is not detected when GrabLab CMS is selected")
 	asJSON := fs.Bool("json", false, "Output JSON")
 
 	if err := fs.Parse(reordered); err != nil {
@@ -126,15 +149,30 @@ func cmdInit(args []string, stdout, stderr io.Writer) int {
 		targetDir = "."
 	}
 
-	res, err := scaffolder.Init(scaffolder.InitOptions{
-		TargetDir:      targetDir,
-		Profile:        *profile,
-		ProjectName:    *name,
-		EdgeProxy:      *edgeProxy,
-		FromSiteDNA:    *fromDNA,
-		Force:          *force,
-		FixedTimestamp: *fixedTS,
-	})
+	initOpts := scaffolder.InitOptions{
+		TargetDir:       targetDir,
+		Profile:         *profile,
+		ProjectName:     *name,
+		EdgeProxy:       *edgeProxy,
+		FromSiteDNA:     *fromDNA,
+		Force:           *force,
+		FixedTimestamp:  *fixedTS,
+		GrabBinary:      *grabBin,
+		RequirePostgres: *requirePG,
+	}
+
+	shouldSurvey := *interactive || (!*nonInteractive && !*asJSON && strings.TrimSpace(*profile) == "" && strings.TrimSpace(*fromDNA) == "" && isInteractiveTTY(os.Stdin))
+	if shouldSurvey {
+		if _, err := scaffolder.RunInteractiveSurvey(os.Stdin, stdout, &initOpts, scaffolder.PrereqOptions{
+			GrabBinary:      *grabBin,
+			RequirePostgres: *requirePG,
+		}); err != nil {
+			return writeError(*asJSON, stdout, stderr, err, 1)
+		}
+		fmt.Fprintln(stdout)
+	}
+
+	res, err := scaffolder.Init(initOpts)
 	if err != nil {
 		return writeError(*asJSON, stdout, stderr, err, 1)
 	}
@@ -145,15 +183,26 @@ func cmdInit(args []string, stdout, stderr io.Writer) int {
 	}
 
 	fmt.Fprintf(stdout, "Scaffolded GRAB workspace at %s\n", res.Workspace)
-	fmt.Fprintf(stdout, "  Project:  %s (profile: %s, edge proxy: %s)\n", res.ProjectName, res.Profile, res.EdgeProxy)
-	if res.HydratedSiteDNA {
-		fmt.Fprintf(stdout, "  Site DNA: hydrated tokens & catalog into storage/site-dna.json\n")
+	fmt.Fprintf(stdout, "  Project:   %s (profile: %s, edge proxy: %s)\n", res.ProjectName, res.Profile, res.EdgeProxy)
+	fmt.Fprintf(stdout, "  Included:  GRAB (>= 1.1.0) & Grex JS v1.0.0 (public/grex/)\n")
+	if res.Prerequisites != nil && res.Prerequisites.PostgresRequired {
+		if res.Prerequisites.PostgresDetected {
+			fmt.Fprintf(stdout, "  Postgres:  [OK] %s\n", res.Prerequisites.PostgresDetail)
+		} else {
+			fmt.Fprintf(stdout, "  Postgres:  [WARN] %s\n", res.Prerequisites.PostgresInstallHint)
+		}
 	}
-	fmt.Fprintf(stdout, "  Lock SHA: %s\n", res.LockDigestSHA256)
+	if res.HydratedSiteDNA {
+		fmt.Fprintf(stdout, "  Site DNA:  hydrated tokens & catalog into storage/site-dna.json\n")
+	}
+	fmt.Fprintf(stdout, "  Lock SHA:  %s\n", res.LockDigestSHA256)
 	fmt.Fprintf(stdout, "  Files (%d):\n", len(res.FilesWritten))
 	for _, f := range res.FilesWritten {
 		fmt.Fprintf(stdout, "    - %s\n", f)
 	}
+	fmt.Fprintf(stdout, "\nNext steps:\n")
+	fmt.Fprintf(stdout, "  grabman doctor --dir %q\n", res.Workspace)
+	fmt.Fprintf(stdout, "  grab serve --allow-scripts --static %q %q\n", "public", "src/app.grab")
 	return 0
 }
 
@@ -215,6 +264,7 @@ func cmdSolve(args []string, stdout, stderr io.Writer) int {
 	fs.SetOutput(io.Discard)
 	dir := fs.String("dir", "", "Target project directory")
 	verifyOnly := fs.Bool("verify", false, "Verify existing grabman.lock deterministically without modifying files")
+	warnIncompatible := fs.Bool("warn-incompatible", false, "Emit non-blocking warnings instead of failing on <2.0.0 incompatible pins")
 	fixedTS := fs.String("fixed-timestamp", "", "Deterministic UTC RFC3339 timestamp override")
 	asJSON := fs.Bool("json", false, "Output JSON")
 
@@ -233,7 +283,10 @@ func cmdSolve(args []string, stdout, stderr io.Writer) int {
 		targetDir = "."
 	}
 
-	opts := solver.SolveOptions{FixedTimestamp: *fixedTS}
+	opts := solver.SolveOptions{
+		FixedTimestamp:   *fixedTS,
+		WarnIncompatible: *warnIncompatible,
+	}
 
 	if *verifyOnly {
 		res, err := solver.Verify(targetDir, opts)
@@ -247,6 +300,9 @@ func cmdSolve(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "grabman.lock verified cleanly across all %d ecosystem layers\n", len(solver.EcosystemMatrix()))
 		fmt.Fprintf(stdout, "  Workspace:  %s\n", res.Workspace)
 		fmt.Fprintf(stdout, "  Lock SHA:   %s\n", res.LockDigestSHA256)
+		for _, w := range res.Warnings {
+			fmt.Fprintf(stdout, "  %s\n", w)
+		}
 		return 0
 	}
 
@@ -272,6 +328,9 @@ func cmdSolve(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	fmt.Fprintln(stdout)
+	for _, w := range res.Warnings {
+		fmt.Fprintf(stdout, "  %s\n", w)
+	}
 	return 0
 }
 
